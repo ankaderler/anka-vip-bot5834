@@ -3,6 +3,8 @@ import threading
 import http.server
 import socketserver
 import logging
+import time
+import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -13,14 +15,14 @@ from telegram.ext import (
     filters,
 )
 
-# Render Web Service Port Ayarı (Kapanmaması için)
+# Render Port Ayarı (Canlı kalması için)
 PORT = int(os.environ.get("PORT", 10000))
 
 class HealthCheckHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"ANKA SMS VIP Bot is live and running!")
+        self.wfile.write(b"ANKA VIP SMS Bot is live and running!")
 
 def run_web_server():
     with socketserver.TCPServer(("", PORT), HealthCheckHandler) as httpd:
@@ -28,23 +30,26 @@ def run_web_server():
 
 threading.Thread(target=run_web_server, daemon=True).start()
 
-# BOT AYARLARI
+# BOT VE API BİLGİLERİ (İstediğin gibi sabitlendi)
 BOT_TOKEN = "8975549312:AAH9mIb8yIsmAfJYimJq0IQ6_kpBu9-kJxY"
-IBAN = "TR06 0001 0021 5470 2002 4550 04"
-RECIPIENT = "Zeynep Alkoç"
+IBAN = "TR62 0006 2000 5000 0006 8107 73"
+RECIPIENT = "Resul Sakal"
 SUPPORT_USERNAME = "SMSPATRONUM"
+
+# Onayla SMS Gerçek API Bilgileri
+SMS_API_KEY = "osms_8da11f457963ece8954eea58hb23aa9a06a6c4983b19977e"
+SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# ÜRÜN / KATEGORİ FİYATLARI
-PRICES = {
-    "tr_wp": 300,
-    "tr_tg": 200,
-    "abd_wp": 150,
-    "uk_wp": 150
+# Servis Kodları ve Ülke Kodları (Dokümana Uygun: Türkiye country=62)
+SERVICES = {
+    "tr_wp": {"name": "TR WhatsApp", "code": "wa", "country": "62", "price": 300},
+    "tr_tg": {"name": "TR Telegram", "code": "tg", "country": "62", "price": 200},
+    "abd_wp": {"name": "ABD WhatsApp", "code": "wa", "country": "18", "price": 150},
+    "uk_wp": {"name": "İngiltere WhatsApp", "code": "wa", "country": "16", "price": 150}
 }
 
-# ANA MENÜ
 def main_menu():
     keyboard = [
         [InlineKeyboardButton("🇹🇷 TR WhatsApp — 300 TL", callback_data="buy_tr_wp")],
@@ -74,29 +79,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data.startswith("buy_"):
         service_key = data.replace("buy_", "")
-        price = PRICES.get(service_key, 300)
+        service_info = SERVICES.get(service_key, SERVICES["tr_wp"])
+        price = service_info["price"]
         
-        # Seçimi hafızaya alalım ki dekont attığında hangi hizmeti istediğini bilelim
         context.user_data["selected_service"] = service_key
 
-        service_names = {
-            "tr_wp": "TR WhatsApp",
-            "tr_tg": "TR Telegram",
-            "abd_wp": "ABD WhatsApp",
-            "uk_wp": "İngiltere WhatsApp"
-        }
-        s_name = service_names.get(service_key, "VIP Numara")
-
         text = (
-            f"🛒 *Seçilen Paket: {s_name}*\n"
+            f"🛒 *Seçilen Paket: {service_info['name']}*\n"
             f"💰 Tutar: *{price} TL*\n\n"
             f"💳 *Ödeme Bilgileri*\n"
             f"IBAN:\n`{IBAN}`\n\n"
             f"Alıcı: *{RECIPIENT}*\n\n"
             "━━━━━━━━━━━━━━━━\n"
             f"1️⃣ Yukarıdaki hesaba *{price} TL* gönderin.\n"
-            "2️⃣ Ödeme yaptıktan sonra banka dekontunun ekran görüntüsünü bu sohbete gönderin.\n"
-            "3️⃣ Bot dekontu onaylayıp numaranızı ve SMS kodunuzu otomatik teslim edecektir."
+            "2️⃣ Ödeme yaptıktan sonra banka dekontunun ekran görüntüsünü bu sohbete gönderin."
         )
         keyboard = [
             [InlineKeyboardButton("⬅️ Ana Menüye Dön", callback_data="home")]
@@ -111,30 +107,47 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=main_menu())
 
-# DEKONT KONTROLÜ VE NUMARA/KOD TESLİMATI
+# Doğru Country ve Service parametreleriyle siteden numara çeken fonksiyon
+def fetch_real_number_with_retry(service_code, country_code):
+    params = {
+        "api_key": SMS_API_KEY,
+        "action": "getNumber",
+        "service": service_code,
+        "country": country_code
+    }
+    
+    last_response = ""
+    for attempt in range(3):
+        try:
+            response = requests.get(SMS_API_URL, params=params, timeout=15)
+            last_response = response.text.strip()
+            
+            if "ACCESS_NUMBER" in last_response:
+                parts = last_response.split(":")
+                activation_id = parts[1] if len(parts) > 1 else "Bilinmiyor"
+                phone_number = parts[2] if len(parts) > 2 else last_response
+                return phone_number, f"Kod Bekleniyor (ID: {activation_id})"
+            
+            time.sleep(2)
+        except Exception as e:
+            last_response = str(e)
+            time.sleep(2)
+            
+    return "Stok Bulunamadı", f"API Yanıtı: {last_response}"
+
 async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.photo or update.message.document:
         service_key = context.user_data.get("selected_service", "tr_wp")
-        
-        service_names = {
-            "tr_wp": "TR WhatsApp",
-            "tr_tg": "TR Telegram",
-            "abd_wp": "ABD WhatsApp",
-            "uk_wp": "İngiltere WhatsApp"
-        }
-        s_name = service_names.get(service_key, "Numara")
+        service_info = SERVICES.get(service_key, SERVICES["tr_wp"])
 
-        # Simüle edilmiş stok / havuz kontrolü ve teslimat
-        # Stokta o an yoksa alternatif havuzdan veya güncel numaradan verilir mantığı:
-        assigned_number = "+90 555 123 45 67" if "tr" in service_key else "+1 (555) 382-9104"
-        sms_code = "482-910" # Simüle edilmiş gelen kod yakalama
+        assigned_number, sms_status = fetch_real_number_with_retry(service_info["code"], service_info["country"])
 
         text = (
-            f"✅ *Dekont Başarıyla Onaylandı!*\n\n"
-            f"📦 Seçilen Servis: *{s_name}*\n"
-            f"📱 *Size Tanımlanan Numara:* `{assigned_number}`\n"
-            f"💬 *Gelen Onay Kodu:* ` {sms_code} `\n\n"
-            f"⚠️ Sorun yaşarsanız destek için: @{SUPPORT_USERNAME}"
+            f"✅ *Dekont Onaylandı & Numara Çekildi!*\n\n"
+            f"📦 Servis: *{service_info['name']}*\n"
+            f"📱 *Numara:* `{assigned_number}`\n"
+            f"💬 *Detay:* `{sms_status}`\n\n"
+            f"⚠️ Destek & Sorun Bildirimi İçin: @{SUPPORT_USERNAME}"
         )
         keyboard = [[InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]]
         await update.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -149,7 +162,7 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receipt_handler))
     
-    print("ANKA VIP SMS BOT AKTİF!")
+    print("ANKA VIP SMS BOT Tamamen Hazır!")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
