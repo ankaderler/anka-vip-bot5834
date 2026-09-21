@@ -29,7 +29,7 @@ def run_web_server():
 threading.Thread(target=run_web_server, daemon=True).start()
 
 # BOT AYARLARI
-BOT_TOKEN = "8966819189:AAENmHdrI8XxNexWFsaAqyfHZn7kxi0N-CQ"
+BOT_TOKEN = "8975549312:AAH9mIb8yIsmAfJYimJq0IQ6_kpBu9-kJxY"
 IBAN = "TR06 0001 0021 5470 2002 4550 04"
 RECIPIENT = "Zeynep Alkoç"
 SUPPORT_USERNAME = "SMSPATRONUM"
