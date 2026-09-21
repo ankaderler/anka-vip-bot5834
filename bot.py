@@ -40,7 +40,7 @@ logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=lo
 
 def main_menu():
     keyboard = [
-        [InlineKeyboardButton("📱 Numara / Hizmet Al", callback_data="get_number")],
+        [InlineKeyboardButton("📱 Numara / Hizmet Seç", callback_data="get_number")],
         [InlineKeyboardButton("💳 Ödeme Bildir / Dekont Gönder", callback_data="buy")],
         [InlineKeyboardButton("📖 Nasıl Kullanılır?", callback_data="how")],
         [InlineKeyboardButton("📞 Destek", callback_data="support")],
@@ -51,7 +51,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
         "🤖 *SMS ONAY VE NUMARA BOTU*\n\n"
         "⚡ Hızlı ve otomatik SMS onay hizmeti.\n"
-        "💰 Önce IBAN'a ödeme yapın, ardından numaranızı alıp kodunuzu anında görüntüleyin.\n\n"
+        "💰 Önce IBAN'a ödeme yapın, ardından numaranızı seçip kodunuzu alın.\n\n"
         "Aşağıdaki menüden işlem seçebilirsiniz."
     )
     if update.message:
@@ -71,42 +71,43 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "━━━━━━━━━━━━━━━━\n"
             "1️⃣ Ücreti yukarıdaki hesaba gönderin.\n"
             "2️⃣ Dekontunuzun ekran görüntüsünü veya fotoğrafını bu sohbete gönderin.\n"
-            "3️⃣ Dekont onaylandıktan sonra numaranız ve kodunuz otomatik teslim edilecektir."
+            "3️⃣ Dekont onaylandıktan sonra seçtiğiniz servis için numaranız otomatik verilecektir."
         )
         keyboard = [[InlineKeyboardButton("⬅️ Ana Menü", callback_data="home")]]
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif query.data == "get_number":
         text = (
-            "📱 *NUMARA SEÇİMİ*\n\n"
-            "Lütfen almak istediğiniz platformu seçin veya doğrudan servis kodunu yazın:"
+            "📱 *HİZMET SEÇİMİ*\n\n"
+            "Lütfen numara almak istediğiniz platformu seçin:"
         )
         keyboard = [
-            [InlineKeyboardButton("🔵 Telegram", callback_data="svc_tg"), InlineKeyboardButton("🟣 WhatsApp", callback_data="svc_wa")],
-            [InlineKeyboardButton("🟡 Google / Gmail", callback_data="svc_gg"), InlineKeyboardButton("⚫ Twitter / X", callback_data="svc_tw")],
+            [InlineKeyboardButton("🔵 Telegram", callback_data="svc_telegram"), InlineKeyboardButton("🟣 WhatsApp", callback_data="svc_whatsapp")],
+            [InlineKeyboardButton("🟡 Google / Gmail", callback_data="svc_google"), InlineKeyboardButton("⚫ Twitter / X", callback_data="svc_twitter")],
             [InlineKeyboardButton("⬅️ Ana Menü", callback_data="home")],
         ]
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif query.data.startswith("svc_"):
-        service_map = {"svc_tg": "telegram", "svc_wa": "whatsapp", "svc_gg": "google", "svc_tw": "twitter"}
-        service_name = service_map.get(query.data, "genel")
-        
-        context.user_data["selected_service"] = service_name
+        service_code = query.data.replace("svc_", "")
+        context.user_data["selected_service"] = service_code
         
         text = (
-            f"✅ Seçilen Servis: *{service_name.upper()}*\n\n"
-            "Şimdi lütfen ödemeyi tamamlayıp dekontunuzu gönderin. Dekontunuz onaylandığı anda sistem otomatik olarak API üzerinden numaranızı tahsis edecektir."
+            f"✅ Seçilen Servis: *{service_code.upper()}*\n\n"
+            "Şimdi ödemeyi yapıp dekontunuzu bota gönderin. Dekont onaylandığı an sistem bu servis için stoktan numara çekecektir."
         )
-        keyboard = [[InlineKeyboardButton("⬅️ Ana Menü", callback_data="home")]]
+        keyboard = [
+            [InlineKeyboardButton("💳 Ödeme Bildir / Dekont Gönder", callback_data="buy")],
+            [InlineKeyboardButton("⬅️ Ana Menü", callback_data="home")]
+        ]
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif query.data == "how":
         text = (
             "📖 *NASIL KULLANILIR?*\n\n"
-            "1️⃣ *Numara / Hizmet Al* menüsünden istediğiniz platformu seçin.\n"
-            "2️⃣ Belirtilen IBAN adresine ödemeyi yapın.\n"
-            "3️⃣ Dekontu bota gönderin. Bot dekontu onaylayınca API üzerinden size özel numarayı ve gelen SMS kodunu sunacaktır."
+            "1️⃣ *Numara / Hizmet Seç* menüsünden platformu seçin.\n"
+            "2️⃣ IBAN'a ödemeyi yapıp dekontu bota atın.\n"
+            "3️⃣ Bot onay verince API üzerinden numaranız ve kodunuz gelecektir."
         )
         keyboard = [[InlineKeyboardButton("⬅️ Ana Menü", callback_data="home")]]
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -121,30 +122,28 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.photo or update.message.document:
-        # Örnek API üzerinden numara talep etme simülasyonu/isteği (OnaylaSMS API standardı)
-        # api_params = {"api_key": SMS_API_KEY, "action": "getNumber", "service": ...}
+        selected_service = context.user_data.get("selected_service", "telegram")
         
         await update.message.reply_text(
             "🎉 *Dekont Başarıyla Alındı ve Onaylandı!*\n\n"
-            "📱 Sistemden numaranız talep ediliyor, lütfen bekleyin...",
+            f"📱 `{selected_service.upper()`} servisi için havuzdan numara talep ediliyor...",
             parse_mode="Markdown"
         )
         
         try:
-            # Örnek API isteği altyapısı (OnaylaSMS GetNumber entegrasyonu)
-            resp = requests.get(f"{SMS_API_URL}?api_key={SMS_API_KEY}&action=getNumber&service=ot", timeout=10)
+            # OnaylaSMS API formatına uygun istek
+            api_url = f"{SMS_API_URL}?api_key={SMS_API_KEY}&action=getNumber&service={selected_service}"
+            resp = requests.get(api_url, timeout=10)
             data_text = resp.text
             
-            # API'den gelen yanıta göre numara veya hata basılır
             await update.message.reply_text(
-                f"✅ *Numaranız Hazır!*\n\n"
-                f"📞 Numara: `+90 555 000 00 00` (Örnek)\n"
-                f"📥 SMS Kodunu bekliyor... Gelen kod otomatik buraya düşecektir.\n\n"
-                f"API Yanıtı: `{data_text}`",
+                f"✅ *İşlem Sonucu / API Yanıtı:*\n\n"
+                f"`{data_text}`\n\n"
+                "*(Eğer API'den numara dönmezse, servis adının sistemdeki kısa kod karşılığını kontrol edebiliriz.)*",
                 parse_mode="Markdown"
             )
         except Exception as e:
-            await update.message.reply_text(f"⚠️ Numara alınırken API bağlantı hatası oluştu: {e}")
+            await update.message.reply_text(f"⚠️ API bağlantı hatası oluştu: {e}")
         return
 
     await update.message.reply_text("📸 Lütfen ödeme dekontunun fotoğrafını veya dosyasını gönderin.")
