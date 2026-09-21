@@ -5,7 +5,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # Yapılandırma Bilgileri (Yeni Token Güncellendi)
 TOKEN = "8966819189:AAFhWDClW5LfI1UQeKZqhgu8C8OCR-qjqzY"
-API_KEY = "sms_78764ab234637198f606b1bb0ce55ced58aabbb2f1be18b3"
+API_KEY = "osms_47d104feae77186b529f51f0104c5b04abd54947a5a6d2ae"
 TARGET_NAME = "Resul Sakal"
 IBAN = "TR62 0006 2000 5000 0006 8107 73"
 
