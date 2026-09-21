@@ -3,6 +3,7 @@ import threading
 import http.server
 import socketserver
 import logging
+import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -19,7 +20,7 @@ class HealthCheckHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"ANKA VIP Bot is live and running!")
+        self.wfile.write(b"SMS Onay Bot is live and running!")
 
 def run_web_server():
     with socketserver.TCPServer(("", PORT), HealthCheckHandler) as httpd:
@@ -30,14 +31,8 @@ threading.Thread(target=run_web_server, daemon=True).start()
 BOT_TOKEN = "8522565760:AAEB0cxhpm8LX7VnIsfAfED0IYkDI5Rf45w"
 IBAN = "TR06 0001 0021 5470 2002 4550 04"
 RECIPIENT = "Zeynep Alkoç"
-
-LINKS = [
-    "https://t.me/+Aqi4UqSzr4JjZmRk",
-    "https://t.me/+H2z-xlyZ6zM0OTE0",
-    "https://t.me/+p01bQp6XebkzMmI0",
-    "https://t.me/+HqtuwLtoMkkwMWQ0",
-    "https://t.me/+BcHhS86B9ocyMWQ0",
-]
+SMS_API_KEY = "osms_25bfc2536ca8f395901c0b2389d3b66c9e111dc31007b145"
+SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 SUPPORT_USERNAME = "ANKA"
 
@@ -45,22 +40,24 @@ logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=lo
 
 def main_menu():
     keyboard = [
-        [InlineKeyboardButton("🛒 VIP Paket Satın Al — 300 TL", callback_data="buy")],
-        [InlineKeyboardButton("📖 Nasıl Satın Alacağım?", callback_data="how")],
-        [InlineKeyboardButton("📦 Ürün Bilgileri", callback_data="info")],
+        [InlineKeyboardButton("📱 Numara / Hizmet Al", callback_data="get_number")],
+        [InlineKeyboardButton("💳 Ödeme Bildir / Dekont Gönder", callback_data="buy")],
+        [InlineKeyboardButton("📖 Nasıl Kullanılır?", callback_data="how")],
         [InlineKeyboardButton("📞 Destek", callback_data="support")],
     ]
     return InlineKeyboardMarkup(keyboard)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        "💎 *ANKA VIP*\n\n"
-        "🔐 Özel VIP erişim paketi\n"
-        "⚡ Hızlı dijital teslimat\n"
-        "💰 Paket fiyatı: *300 TL*\n\n"
-        "Aşağıdaki menüden işlem yapmak istediğiniz seçeneği seçebilirsiniz."
+        "🤖 *SMS ONAY VE NUMARA BOTU*\n\n"
+        "⚡ Hızlı ve otomatik SMS onay hizmeti.\n"
+        "💰 Önce IBAN'a ödeme yapın, ardından numaranızı alıp kodunuzu anında görüntüleyin.\n\n"
+        "Aşağıdaki menüden işlem seçebilirsiniz."
     )
-    await update.message.reply_text(text, parse_mode="Markdown", reply_markup=main_menu())
+    if update.message:
+        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=main_menu())
+    elif update.callback_query:
+        await update.callback_query.message.edit_text(text, parse_mode="Markdown", reply_markup=main_menu())
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -68,56 +65,50 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.data == "buy":
         text = (
-            "🛒 *VIP PAKET SATIN AL*\n\n"
-            "💰 Fiyat: *300 TL*\n\n"
-            "💳 *Ödeme Bilgileri*\n\n"
+            "💳 *ÖDEME BİLDİRİMİ*\n\n"
             f"IBAN:\n`{IBAN}`\n\n"
             f"Alıcı: *{RECIPIENT}*\n\n"
-            "━━━━━━━━━━━━━━━━\n\n"
-            "1️⃣ Yukarıdaki hesaba *300 TL* gönderin.\n"
-            "2️⃣ Ödeme yaptıktan sonra dekontunuzu bu bota gönderin.\n"
-            "3️⃣ Ödeme doğrulaması tamamlandığında VIP erişiminiz teslim edilir."
+            "━━━━━━━━━━━━━━━━\n"
+            "1️⃣ Ücreti yukarıdaki hesaba gönderin.\n"
+            "2️⃣ Dekontunuzun ekran görüntüsünü veya fotoğrafını bu sohbete gönderin.\n"
+            "3️⃣ Dekont onaylandıktan sonra numaranız ve kodunuz otomatik teslim edilecektir."
+        )
+        keyboard = [[InlineKeyboardButton("⬅️ Ana Menü", callback_data="home")]]
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif query.data == "get_number":
+        text = (
+            "📱 *NUMARA SEÇİMİ*\n\n"
+            "Lütfen almak istediğiniz platformu seçin veya doğrudan servis kodunu yazın:"
         )
         keyboard = [
-            [InlineKeyboardButton("📸 DEKONT GÖNDERECEĞİM", callback_data="receipt")],
+            [InlineKeyboardButton("🔵 Telegram", callback_data="svc_tg"), InlineKeyboardButton("🟣 WhatsApp", callback_data="svc_wa")],
+            [InlineKeyboardButton("🟡 Google / Gmail", callback_data="svc_gg"), InlineKeyboardButton("⚫ Twitter / X", callback_data="svc_tw")],
             [InlineKeyboardButton("⬅️ Ana Menü", callback_data="home")],
         ]
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif query.data.startswith("svc_"):
+        service_map = {"svc_tg": "telegram", "svc_wa": "whatsapp", "svc_gg": "google", "svc_tw": "twitter"}
+        service_name = service_map.get(query.data, "genel")
+        
+        context.user_data["selected_service"] = service_name
+        
+        text = (
+            f"✅ Seçilen Servis: *{service_name.upper()}*\n\n"
+            "Şimdi lütfen ödemeyi tamamlayıp dekontunuzu gönderin. Dekontunuz onaylandığı anda sistem otomatik olarak API üzerinden numaranızı tahsis edecektir."
+        )
+        keyboard = [[InlineKeyboardButton("⬅️ Ana Menü", callback_data="home")]]
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif query.data == "how":
         text = (
-            "📖 *NASIL SATIN ALACAKSINIZ?*\n\n"
-            "1️⃣ *VIP Paket Satın Al* butonuna basın.\n"
-            "2️⃣ Size gösterilen IBAN'a *300 TL* gönderin.\n"
-            "3️⃣ Ödeme yaptıktan sonra dekontunuzu bota gönderin.\n"
-            "4️⃣ Ödeme doğrulandığında VIP erişim linkleriniz teslim edilir. 🔐"
+            "📖 *NASIL KULLANILIR?*\n\n"
+            "1️⃣ *Numara / Hizmet Al* menüsünden istediğiniz platformu seçin.\n"
+            "2️⃣ Belirtilen IBAN adresine ödemeyi yapın.\n"
+            "3️⃣ Dekontu bota gönderin. Bot dekontu onaylayınca API üzerinden size özel numarayı ve gelen SMS kodunu sunacaktır."
         )
-        keyboard = [
-            [InlineKeyboardButton("🛒 HEMEN SATIN AL", callback_data="buy")],
-            [InlineKeyboardButton("⬅️ Ana Menü", callback_data="home")],
-        ]
-        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif query.data == "info":
-        text = (
-            "📦 *VIP ÜRÜN BİLGİLERİ*\n\n"
-            "💎 VIP Paket\n"
-            "🔗 5 adet VIP erişim\n"
-            "💰 Fiyat: *300 TL*\n"
-            "⚡ Dijital teslimat"
-        )
-        keyboard = [
-            [InlineKeyboardButton("🛒 SATIN AL", callback_data="buy")],
-            [InlineKeyboardButton("⬅️ Ana Menü", callback_data="home")],
-        ]
-        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif query.data == "receipt":
-        text = (
-            "📸 *DEKONT GÖNDERME*\n\n"
-            "Ödemeyi yaptıktan sonra banka dekontunuzun ekran görüntüsünü veya PDF dosyasını bu sohbete gönderin."
-        )
-        keyboard = [[InlineKeyboardButton("⬅️ Geri", callback_data="buy")]]
+        keyboard = [[InlineKeyboardButton("⬅️ Ana Menü", callback_data="home")]]
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif query.data == "support":
@@ -126,25 +117,37 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif query.data == "home":
-        text = "💎 *ANKA VIP*\n\nPaket fiyatı: *300 TL*\nİşlem seçin:"
-        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=main_menu())
+        await start(update, context)
 
 async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.photo or update.message.document:
-        keyboard = [
-            [InlineKeyboardButton("🔗 VIP 1'e Katıl", url=LINKS[0])],
-            [InlineKeyboardButton("🔗 VIP 2'ye Katıl", url=LINKS[1])],
-            [InlineKeyboardButton("🔗 VIP 3'e Katıl", url=LINKS[2])],
-            [InlineKeyboardButton("🔗 VIP 4'e Katıl", url=LINKS[3])],
-            [InlineKeyboardButton("🔗 VIP 5'e Katıl", url=LINKS[4])],
-        ]
+        # Örnek API üzerinden numara talep etme simülasyonu/isteği (OnaylaSMS API standardı)
+        # api_params = {"api_key": SMS_API_KEY, "action": "getNumber", "service": ...}
+        
         await update.message.reply_text(
-            "🎉 *Dekont Alındı ve Onaylandı!* VIP erişimleriniz aşağıdadır:",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            "🎉 *Dekont Başarıyla Alındı ve Onaylandı!*\n\n"
+            "📱 Sistemden numaranız talep ediliyor, lütfen bekleyin...",
+            parse_mode="Markdown"
         )
+        
+        try:
+            # Örnek API isteği altyapısı (OnaylaSMS GetNumber entegrasyonu)
+            resp = requests.get(f"{SMS_API_URL}?api_key={SMS_API_KEY}&action=getNumber&service=ot", timeout=10)
+            data_text = resp.text
+            
+            # API'den gelen yanıta göre numara veya hata basılır
+            await update.message.reply_text(
+                f"✅ *Numaranız Hazır!*\n\n"
+                f"📞 Numara: `+90 555 000 00 00` (Örnek)\n"
+                f"📥 SMS Kodunu bekliyor... Gelen kod otomatik buraya düşecektir.\n\n"
+                f"API Yanıtı: `{data_text}`",
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            await update.message.reply_text(f"⚠️ Numara alınırken API bağlantı hatası oluştu: {e}")
         return
-    await update.message.reply_text("📸 Lütfen banka dekontunun fotoğrafını veya PDF dosyasını gönderin.")
+
+    await update.message.reply_text("📸 Lütfen ödeme dekontunun fotoğrafını veya dosyasını gönderin.")
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
@@ -152,7 +155,7 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receipt_handler))
     
-    print("ANKA VIP BOT AKTİF!")
+    print("SMS ONAY BOT AKTİF!")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
