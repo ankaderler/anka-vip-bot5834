@@ -28,7 +28,7 @@ def run_web_server():
 
 threading.Thread(target=run_web_server, daemon=True).start()
 
-BOT_TOKEN = "8522565760:AAEB0cxhpm8LX7VnIsfAfED0IYkDI5Rf45w"
+BOT_TOKEN = "8966819189:AAENmHdrI8XxNexWFsaAqyfHZn7kxi0N-CQ"
 IBAN = "TR06 0001 0021 5470 2002 4550 04"
 RECIPIENT = "Zeynep Alkoç"
 SMS_API_KEY = "osms_25bfc2536ca8f395901c0b2389d3b66c9e111dc31007b145"
