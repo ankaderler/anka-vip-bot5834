@@ -3,6 +3,8 @@ import threading
 import http.server
 import socketserver
 import logging
+import time
+import requests
 from telegram import Update, LabeledPrice, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -21,7 +23,7 @@ class HealthCheckHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"VIP Link Delivery Bot is live and running!")
+        self.wfile.write(b"ANKA VIP SMS Bot is live and running!")
 
 def run_web_server():
     with socketserver.TCPServer(("", PORT), HealthCheckHandler) as httpd:
@@ -29,38 +31,41 @@ def run_web_server():
 
 threading.Thread(target=run_web_server, daemon=True).start()
 
-# BOT VE ÖDEME BİLGİLERİ
-BOT_TOKEN = "8522565760:AAGHVItP1h7Wn_CS41IapWDIEVuDiNOQTNs"
+# BOT VE API BİLGİLERİ
+BOT_TOKEN = "8966819189:AAENmHdrI8XxNexWFsaAqyfHZn7kxi0N-CQ"
 IBAN = "TR62 0006 2000 5000 0006 8107 73"
 RECIPIENT = "Resul Sakal"
-PRICE_TL = "300 TL"
-PRICE_STARS = 150  # Telegram Yıldız Miktarı
+SUPPORT_USERNAME = "SMSPATRONUM"
 
-# TESLİM EDİLECEK VIP LİNKLER
-VIP_LINKS = [
-    "https://t.me/+Aqi4UqSzr4JjZmRk",
-    "https://t.me/+H2z-xlyZ6zM0OTE0",
-    "https://t.me/+p01bQp6XebkzMmI0",
-    "https://t.me/+HqtuwLtoMkkwMWQ0",
-    "https://t.me/+BcHhS86B9ocyMWQ0"
-]
+# Onayla SMS Gerçek API Bilgileri
+SMS_API_KEY = "osms_22b64d99ef2cb5fe8ab861d472df52d8ef4282e959b3ec2a"
+SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
+# Servis Kodları ve Ülke Kodları (Yıldız karşılıkları eklendi: 1 Yıldız = ~2 TL hesabı ile)
+SERVICES = {
+    "tr_wp": {"name": "TR WhatsApp", "code": "wa", "country": "62", "price_tl": 300, "price_stars": 150},
+    "tr_tg": {"name": "TR Telegram", "code": "tg", "country": "62", "price_tl": 200, "price_stars": 100},
+    "abd_wp": {"name": "ABD WhatsApp", "code": "wa", "country": "18", "price_tl": 150, "price_stars": 75},
+    "uk_wp": {"name": "İngiltere WhatsApp", "code": "wa", "country": "16", "price_tl": 150, "price_stars": 75}
+}
+
 def main_menu():
     keyboard = [
-        [InlineKeyboardButton("⭐ Telegram Yıldızı ile Satın Al (Anında)", callback_data="buy_with_stars")],
-        [InlineKeyboardButton("💳 IBAN / Havale ile Satın Al (300 TL)", callback_data="buy_with_iban")],
-        [InlineKeyboardButton("📖 Nasıl Satın Alınır?", callback_data="how_to_buy")],
-        [InlineKeyboardButton("📞 Destek İletişim", url="https://t.me/SMSPATRONUM")],
+        [InlineKeyboardButton("🇹🇷 TR WhatsApp — 300 TL / 150 ⭐", callback_data="serv_tr_wp")],
+        [InlineKeyboardButton("🇹🇷 TR Telegram — 200 TL / 100 ⭐", callback_data="serv_tr_tg")],
+        [InlineKeyboardButton("🇺🇸 ABD WhatsApp — 150 TL / 75 ⭐", callback_data="serv_abd_wp")],
+        [InlineKeyboardButton("🇬🇧 İngiltere WhatsApp — 150 TL / 75 ⭐", callback_data="serv_uk_wp")],
+        [InlineKeyboardButton("📞 Canlı Destek", url=f"https://t.me/{SUPPORT_USERNAME}")],
     ]
     return InlineKeyboardMarkup(keyboard)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        "🔥 *HOŞ GELDİNİZ — ELİT VIP ARŞİV*\n\n"
-        "✨ Tamamen özel ve gizli içeriklerin bulunduğu VIP kanallarımıza dilediğiniz ödeme yöntemiyle anında erişim sağlayın.\n\n"
-        "👇 Aşağıdaki menüden işlem yapabilirsiniz:"
+        "💎 *ANKA VIP — SMS ONAY SERVİSİ*\n\n"
+        "⚡ Güvenli ve Hızlı Numara Tedariği\n"
+        "Aşağıdaki menüden dilediğiniz ülke ve platformu seçerek ödeme yöntemine geçebilirsiniz."
     )
     if update.message:
         await update.message.reply_text(text, parse_mode="Markdown", reply_markup=main_menu())
@@ -73,12 +78,52 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = query.data
 
-    if data == "buy_with_stars":
-        title = "Elit VIP Arşiv Erişimi"
-        description = "5 Özel VIP Kanalına Sınırsız ve Anında Erişim Linkleri"
-        payload = "vip_archive_payload"
+    if data.startswith("serv_"):
+        service_key = data.replace("serv_", "")
+        service_info = SERVICES.get(service_key, SERVICES["tr_wp"])
+        
+        context.user_data["selected_service"] = service_key
+
+        text = (
+            f"🛒 *Seçilen Paket: {service_info['name']}*\n\n"
+            "👇 Lütfen ödemeyi yapmak istediğiniz yöntemi seçin:"
+        )
+        keyboard = [
+            [InlineKeyboardButton(f"⭐ Telegram Yıldızı ile Al ({service_info['price_stars']} Yıldız)", callback_data=f"star_{service_key}")],
+            [InlineKeyboardButton(f"💳 IBAN / Havale ile Al ({service_info['price_tl']} TL)", callback_data=f"iban_{service_key}")],
+            [InlineKeyboardButton("⬅️ Geri", callback_data="home")]
+        ]
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data.startswith("iban_"):
+        service_key = data.replace("iban_", "")
+        service_info = SERVICES.get(service_key, SERVICES["tr_wp"])
+        context.user_data["selected_service"] = service_key
+
+        text = (
+            f"💳 *IBAN İLE ÖDEME EKRANI*\n\n"
+            f"📦 Paket: *{service_info['name']}*\n"
+            f"💰 Tutar: *{service_info['price_tl']} TL*\n\n"
+            f"IBAN:\n`{IBAN}`\n\n"
+            f"Alıcı: *{RECIPIENT}*\n\n"
+            "━━━━━━━━━━━━━━━━\n"
+            f"1️⃣ Yukarıdaki hesaba tam *{service_info['price_tl']} TL* gönderin.\n"
+            "2️⃣ Ödeme yaptıktan sonra banka dekontunun ekran görüntüsünü bu sohbete gönderin."
+        )
+        keyboard = [[InlineKeyboardButton("⬅️ Geri", callback_data=f"serv_{service_key}")]]
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data.startswith("star_"):
+        service_key = data.replace("star_", "")
+        service_info = SERVICES.get(service_key, SERVICES["tr_wp"])
+        context.user_data["selected_service"] = service_key
+
+        # Telegram Stars Fatura Gönderimi
+        title = f"SMS Onay: {service_info['name']}"
+        description = f"{service_info['name']} için anında numara ve SMS aktivasyon hizmeti."
+        payload = f"sms_pay_{service_key}"
         currency = "XTR"
-        prices = [LabeledPrice("VIP Erişim", PRICE_STARS)]
+        prices = [LabeledPrice("SMS Onay Hizmeti", service_info["price_stars"])]
 
         await context.bot.send_invoice(
             chat_id=query.message.chat_id,
@@ -88,85 +133,89 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             provider_token="",
             currency=currency,
             prices=prices,
-            start_parameter="vip-sub"
+            start_parameter="sms-sub"
         )
-
-    elif data == "buy_with_iban":
-        text = (
-            f"💎 *VIP ÜYELİK ÖDEME EKRANI (IBAN)*\n\n"
-            f"📦 Paket: *Elit VIP Sınırsız Erişim*\n"
-            f"💰 Tutar: *{PRICE_TL}*\n\n"
-            f"💳 *Banka Bilgileri (HAVALE / EFT / FAST)*\n"
-            f"IBAN:\n`{IBAN}`\n\n"
-            f"Alıcı Adı: *{RECIPIENT}*\n\n"
-            "━━━━━━━━━━━━━━━━━━━━━\n"
-            f"1️⃣ Yukarıdaki IBAN adresine tam *{PRICE_TL}* gönderin.\n"
-            "2️⃣ İşlem sonrası banka dekontunun ekran görüntüsünü veya PDF dosyasını doğrudan bu bota gönderin.\n"
-            "3️⃣ Sistem dekontu algıladığı anda VIP linkleriniz anında otomatik olarak iletilecektir!"
-        )
-        keyboard = [
-            [InlineKeyboardButton("⬅️ Ana Menüye Dön", callback_data="home")]
-        ]
-        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif data == "how_to_buy":
-        text = (
-            "📖 *NASIL SATIN ALINIR? (REHBER)*\n\n"
-            "Botumuz üzerinden VIP arşiv linklerine sahip olmak son derece kolaydır:\n\n"
-            "⭐ **Telegram Yıldızı ile:** Butona tıkladığınızda açılan güvenli Telegram penceresinden yıldız göndererek **anında ve bekletmeden** linkleri alabilirsiniz.\n\n"
-            "💳 **IBAN ile:** Belirtilen IBAN'a 300 TL havale yaptıktan sonra dekontu bota fotoğraf olarak atarsınız, onay sonrası linkleriniz verilir.\n\n"
-            "⚠️ *Herhangi bir sorun yaşarsanız destek butonundan bize ulaşabilirsiniz.*"
-        )
-        keyboard = [
-            [InlineKeyboardButton("⬅️ Ana Menüye Dön", callback_data="home")]
-        ]
-        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "home":
         text = (
-            "🔥 *HOŞ GELDİNİZ — ELİT VIP ARŞİV*\n\n"
-            "✨ Tamamen özel ve gizli içeriklerin bulunduğu VIP kanallarımıza dilediğiniz ödeme yöntemiyle anında erişim sağlayın.\n\n"
-            "👇 Aşağıdaki menüden işlem yapabilirsiniz:"
+            "💎 *ANKA VIP — SMS ONAY SERVİSİ*\n\n"
+            "⚡ Güvenli ve Hızlı Numara Tedariği\n"
+            "Aşağıdaki menüden almak istediğiniz ülke ve platformu seçebilirsiniz."
         )
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=main_menu())
 
+# Yıldız Ödemesi Ön Onay
 async def pre_checkout_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.pre_checkout_query
-    if query.invoice_payload == "vip_archive_payload":
+    if query.invoice_payload.startswith("sms_pay_"):
         await query.answer(ok=True)
 
+# Doğru Country ve Service parametreleriyle siteden numara çeken fonksiyon
+def fetch_real_number_with_retry(service_code, country_code):
+    params = {
+        "api_key": SMS_API_KEY,
+        "action": "getNumber",
+        "service": service_code,
+        "country": country_code
+    }
+    
+    last_response = ""
+    for attempt in range(3):
+        try:
+            response = requests.get(SMS_API_URL, params=params, timeout=15)
+            last_response = response.text.strip()
+            
+            if "ACCESS_NUMBER" in last_response:
+                parts = last_response.split(":")
+                activation_id = parts[1] if len(parts) > 1 else "Bilinmiyor"
+                phone_number = parts[2] if len(parts) > 2 else last_response
+                return phone_number, f"Kod Bekleniyor (ID: {activation_id})"
+            
+            time.sleep(2)
+        except Exception as e:
+            last_response = str(e)
+            time.sleep(2)
+            
+    return "Stok Bulunamadı", f"API Yanıtı: {last_response}"
+
+# Yıldız Ödemesi Başarılı Olduğunda Numara Çekme
 async def successful_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     payment = update.message.successful_payment
-    if payment.invoice_payload == "vip_archive_payload":
-        links_text = "\n".join([f"🔗 {link}" for link in VIP_LINKS])
+    if payment.invoice_payload.startswith("sms_pay_"):
+        service_key = payment.invoice_payload.replace("sms_pay_", "")
+        service_info = SERVICES.get(service_key, SERVICES["tr_wp"])
+
+        assigned_number, sms_status = fetch_real_number_with_retry(service_info["code"], service_info["country"])
+
         text = (
-            "⭐ *ÖDEMENİZ BAŞARIYLA ALINDI! (TELEGRAM STARS)*\n\n"
-            "🎉 Tebrikler! VIP arşivlerimize anında erişim hakkı kazandınız. Özel davet linkleriniz:\n\n"
-            f"{links_text}\n\n"
-            "⚠️ *Bu linkler kişiye özeldir, lütfen başka kimseyle paylaşmayın.*"
+            "⭐ *YILDIZ ÖDEMESİ BAŞARILI & NUMARA ÇEKİLDİ!*\n\n"
+            f"📦 Servis: *{service_info['name']}*\n"
+            f"📱 *Numara:* `{assigned_number}`\n"
+            f"💬 *Detay:* `{sms_status}`\n\n"
+            f"⚠️ Destek & Sorun Bildirimi İçin: @{SUPPORT_USERNAME}"
         )
-        keyboard = [
-            [InlineKeyboardButton("🏠 Ana Menüye Dön", callback_data="home")]
-        ]
+        keyboard = [[InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]]
         await update.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.photo or update.message.document:
-        links_text = "\n".join([f"🔗 {link}" for link in VIP_LINKS])
-        
+        service_key = context.user_data.get("selected_service", "tr_wp")
+        service_info = SERVICES.get(service_key, SERVICES["tr_wp"])
+
+        assigned_number, sms_status = fetch_real_number_with_retry(service_info["code"], service_info["country"])
+
         text = (
-            "✅ *DEKONT ONAYLANDI! ÖDEMENİZ BAŞARIYLA ALINDI.*\n\n"
-            "🎉 Tebrikler! VIP arşivlerimize erişim hakkı kazandınız. Aşağıdaki gizli davet linklerine tıklayarak kanallara hemen katılabilirsiniz:\n\n"
-            f"{links_text}\n\n"
-            "⚠️ *Bu linkler kişiye özeldir, lütfen başka kimseyle paylaşmayın.*"
+            f"✅ *Dekont Onaylandı & Numara Çekildi!*\n\n"
+            f"📦 Servis: *{service_info['name']}*\n"
+            f"📱 *Numara:* `{assigned_number}`\n"
+            f"💬 *Detay:* `{sms_status}`\n\n"
+            f"⚠️ Destek & Sorun Bildirimi İçin: @{SUPPORT_USERNAME}"
         )
-        keyboard = [
-            [InlineKeyboardButton("🏠 Ana Menüye Dön", callback_data="home")]
-        ]
+        keyboard = [[InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]]
         await update.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    await update.message.reply_text("📸 Lütfen geçerli bir dekont ekran görüntüsü veya dosyası gönderin.")
+    await update.message.reply_text("📸 Lütfen geçerli bir dekont görseli veya dosyası gönderin.")
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
@@ -177,7 +226,7 @@ def main():
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_handler))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receipt_handler))
     
-    print("VIP IBAN ve Yıldız Ödeme Botu Tamamen Hazır!")
+    print("ANKA VIP SMS BOT Tamamen Hazır (IBAN + Yıldız Aktif)!")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
