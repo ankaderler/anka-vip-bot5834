@@ -37,8 +37,8 @@ IBAN = "TR62 0006 2000 5000 0006 8107 73"
 RECIPIENT = "Resul Sakal"
 SUPPORT_USERNAME = "SMSPATRONUM"
 
-# Onayla SMS Gerçek API Bilgileri
-SMS_API_KEY = "osms_22b64d99ef2cb5fe8ab861d472df52d8ef4282e959b3ec2a"
+# Güncellenen Yeni API Anahtarı
+SMS_API_KEY = "osms_1a63dee621f99dd7a01b8082b0de694c23a822dce4a24225"
 SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
@@ -194,7 +194,7 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
             f"⚠️ Destek & Sorun Bildirimi İçin: @{SUPPORT_USERNAME}"
         )
         keyboard = [[InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]]
-        await update.message.reply_text(text, parse_Mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.photo or update.message.document:
