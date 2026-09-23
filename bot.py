@@ -15,7 +15,7 @@ from telegram.ext import (
     filters,
 )
 
-# Render Port Ayarı (Canlı kalması için)
+# Render Port Ayarı
 PORT = int(os.environ.get("PORT", 10000))
 
 class HealthCheckHandler(http.server.SimpleHTTPRequestHandler):
@@ -36,13 +36,12 @@ IBAN = "TR62 0006 2000 5000 0006 8107 73"
 RECIPIENT = "Resul Sakal"
 SUPPORT_USERNAME = "SMSPATRONUM"
 
-# Onaylasms API Bilgileri
 SMS_API_KEY = "osms_1a63dee621f99dd7a01b8082b0de694c23a822dce4a24225"
 SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# Güncellenmiş Servisler ve Karşılıklı Fiyatlandırma (Yıldızlar kaldırıldı, karlı TL fiyatları eklendi)
+# İstediğin Servisler ve Karlı Fiyatlar (Yıldızlar tamamen kaldırıldı)
 SERVICES = {
     "tr_wp": {"name": "🇹🇷 TR WhatsApp", "code": "wa", "country": "62", "price_tl": 300},
     "tr_tg": {"name": "🇹🇷 TR Telegram", "code": "tg", "country": "62", "price_tl": 200},
@@ -69,7 +68,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Aşağıdaki menüden almak istediğiniz servisi seçerek ödeme adımına geçebilirsiniz."
     )
     if update.message:
-        await update.message.reply_text(text, parse_Mode="Markdown", reply_markup=main_menu())
+        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=main_menu())
     elif update.callback_query:
         await update.callback_query.message.edit_text(text, parse_mode="Markdown", reply_markup=main_menu())
 
@@ -82,7 +81,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         service_key = data.replace("iban_", "")
         service_info = SERVICES.get(service_key, SERVICES["tr_wp"])
         
-        # Seçilen servisi hem state'e hem de kullanıcı verisine güvenli şekilde kaydedelim
         context.user_data["selected_service"] = service_key
 
         text = (
@@ -106,7 +104,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=main_menu())
 
-# Hızlı ve Güçlü Numara Çekme Döngüsü
+# Numara Çekme ve Tekrar Deneme Döngüsü
 def fetch_real_number_with_retry(service_code, country_code):
     params = {
         "api_key": SMS_API_KEY,
@@ -116,7 +114,6 @@ def fetch_real_number_with_retry(service_code, country_code):
     }
     
     last_response = ""
-    # Stok bulana kadar 15 kez ard arda hızlıca yoklar
     for attempt in range(15):
         try:
             response = requests.get(SMS_API_URL, params=params, timeout=10)
@@ -139,16 +136,9 @@ def fetch_real_number_with_retry(service_code, country_code):
 
 async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.photo or update.message.document:
-        # Dekont atıldığında servis hafızadan silindiyse varsayılan olarak tr_wp atanır ama kullanıcı mağdur olmasın diye uyarı verilir.
-        service_key = context.user_data.get("selected_service")
-        
-        if not service_key:
-            # Eğer kullanıcı menüden seçimi unutup direkt dekont attıysa en çok satılan TR WhatsApp seçilir
-            service_key = "tr_wp"
-            
+        service_key = context.user_data.get("selected_service", "tr_wp")
         service_info = SERVICES.get(service_key, SERVICES["tr_wp"])
 
-        # Kullanıcıya işlemin alındığını belirten bilgi mesajı atalım
         processing_msg = await update.message.reply_text("🔄 Dekont alındı, havuzdan anında numara çekiliyor, lütfen bekleyin...")
 
         assigned_number, sms_status = fetch_real_number_with_retry(service_info["code"], service_info["country"])
