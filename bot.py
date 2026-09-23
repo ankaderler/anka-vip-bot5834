@@ -37,16 +37,19 @@ IBAN = "TR62 0006 2000 5000 0006 8107 73"
 RECIPIENT = "Resul Sakal"
 SUPPORT_USERNAME = "SMSPATRONUM"
 
-# Güncellenen Yeni API Anahtarı
+# Onayla SMS Gerçek API Bilgileri
 SMS_API_KEY = "osms_1a63dee621f99dd7a01b8082b0de694c23a822dce4a24225"
 SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# Servis Kodları ve Ülke Kodları
+# Yeni Servisler ve Karlı Fiyatlandırmalar (Instagram, Facebook, Google ve Diğerleri)
 SERVICES = {
     "tr_wp": {"name": "TR WhatsApp", "code": "wa", "country": "62", "price_tl": 300, "price_stars": 150},
     "tr_tg": {"name": "TR Telegram", "code": "tg", "country": "62", "price_tl": 200, "price_stars": 100},
+    "tr_ig": {"name": "TR Instagram", "code": "ig", "country": "62", "price_tl": 60, "price_stars": 30},
+    "tr_fb": {"name": "TR Facebook", "code": "fb", "country": "62", "price_tl": 50, "price_stars": 25},
+    "tr_go": {"name": "TR Google", "code": "go", "country": "62", "price_tl": 30, "price_stars": 15},
     "abd_wp": {"name": "ABD WhatsApp", "code": "wa", "country": "18", "price_tl": 150, "price_stars": 75},
     "uk_wp": {"name": "İngiltere WhatsApp", "code": "wa", "country": "16", "price_tl": 150, "price_stars": 75}
 }
@@ -55,6 +58,9 @@ def main_menu():
     keyboard = [
         [InlineKeyboardButton("🇹🇷 TR WhatsApp — 300 TL / 150 ⭐", callback_data="serv_tr_wp")],
         [InlineKeyboardButton("🇹🇷 TR Telegram — 200 TL / 100 ⭐", callback_data="serv_tr_tg")],
+        [InlineKeyboardButton("📸 TR Instagram — 60 TL / 30 ⭐", callback_data="serv_tr_ig")],
+        [InlineKeyboardButton("📘 TR Facebook — 50 TL / 25 ⭐", callback_data="serv_tr_fb")],
+        [InlineKeyboardButton("🌐 TR Google — 30 TL / 15 ⭐", callback_data="serv_tr_go")],
         [InlineKeyboardButton("🇺🇸 ABD WhatsApp — 150 TL / 75 ⭐", callback_data="serv_abd_wp")],
         [InlineKeyboardButton("🇬🇧 İngiltere WhatsApp — 150 TL / 75 ⭐", callback_data="serv_uk_wp")],
         [InlineKeyboardButton("📞 Canlı Destek", url=f"https://t.me/{SUPPORT_USERNAME}")],
@@ -148,7 +154,7 @@ async def pre_checkout_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     if query.invoice_payload.startswith("sms_pay_"):
         await query.answer(ok=True)
 
-# API yanıtını detaylı loglayan fonksiyon
+# API yanıtını detaylı kontrol eden fonksiyon
 def fetch_real_number_with_retry(service_code, country_code):
     params = {
         "api_key": SMS_API_KEY,
@@ -176,7 +182,7 @@ def fetch_real_number_with_retry(service_code, country_code):
             logging.error(f"API İstek Hatası: {last_response}")
             time.sleep(2)
             
-    return "Stok Bulunamadı", f"API Yanıtı: {last_response}"
+    return None, last_response
 
 async def successful_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     payment = update.message.successful_payment
@@ -186,15 +192,28 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
 
         assigned_number, sms_status = fetch_real_number_with_retry(service_info["code"], service_info["country"])
 
-        text = (
-            "⭐ *YILDIZ ÖDEMESİ BAŞARILI & NUMARA ÇEKİLDİ!*\n\n"
-            f"📦 Servis: *{service_info['name']}*\n"
-            f"📱 *Numara:* `{assigned_number}`\n"
-            f"💬 *Detay:* `{sms_status}`\n\n"
-            f"⚠️ Destek & Sorun Bildirimi İçin: @{SUPPORT_USERNAME}"
-        )
-        keyboard = [[InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]]
-        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        if assigned_number:
+            text = (
+                "⭐ *YILDIZ ÖDEMESİ BAŞARILI & NUMARA ÇEKİLDİ!*\n\n"
+                f"📦 Servis: *{service_info['name']}*\n"
+                f"📱 *Numara:* `{assigned_number}`\n"
+                f"💬 *Detay:* `{sms_status}`\n\n"
+                f"⚠️ Destek & Sorun Bildirimi İçin: @{SUPPORT_USERNAME}"
+            )
+            keyboard = [[InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]]
+            await update.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            text = (
+                "⚠️ *Anlık yoğunluk nedeniyle numara tedarik edilemedi!*\n\n"
+                f"API Yanıtı: `{sms_status}`\n"
+                f"Lütfen hemen canlı destekten numaranızı isteyin:\n"
+                f"İletişim / Destek: @{SUPPORT_USERNAME}"
+            )
+            keyboard = [
+                [InlineKeyboardButton("📞 Canlı Destek ile Bağlan", url=f"https://t.me/{SUPPORT_USERNAME}")],
+                [InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]
+            ]
+            await update.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.photo or update.message.document:
@@ -203,15 +222,28 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         assigned_number, sms_status = fetch_real_number_with_retry(service_info["code"], service_info["country"])
 
-        text = (
-            f"✅ *Dekont Onaylandı & Numara Çekildi!*\n\n"
-            f"📦 Servis: *{service_info['name']}*\n"
-            f"📱 *Numara:* `{assigned_number}`\n"
-            f"💬 *Detay:* `{sms_status}`\n\n"
-            f"⚠️ Destek & Sorun Bildirimi İçin: @{SUPPORT_USERNAME}"
-        )
-        keyboard = [[InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]]
-        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        if assigned_number:
+            text = (
+                f"✅ *Dekont Onaylandı & Numara Çekildi!*\n\n"
+                f"📦 Servis: *{service_info['name']}*\n"
+                f"📱 *Numara:* `{assigned_number}`\n"
+                f"💬 *Detay:* `{sms_status}`\n\n"
+                f"⚠️ Destek & Sorun Bildirimi İçin: @{SUPPORT_USERNAME}"
+            )
+            keyboard = [[InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]]
+            await update.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            text = (
+                "⚠️ *Anlık yoğunluk nedeniyle alternatif havuzda da numara kalmadı!*\n\n"
+                f"API Yanıtı: `{sms_status}`\n"
+                f"Lütfen hemen canlı destekten numaranızı isteyin:\n"
+                f"İletişim / Destek: @{SUPPORT_USERNAME}"
+            )
+            keyboard = [
+                [InlineKeyboardButton("📞 Canlı Destek ile Bağlan", url=f"https://t.me/{SUPPORT_USERNAME}")],
+                [InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]
+            ]
+            await update.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
     await update.message.reply_text("📸 Lütfen geçerli bir dekont görseli veya dosyası gönderin.")
