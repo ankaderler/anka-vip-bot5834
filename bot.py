@@ -43,26 +43,24 @@ SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# Yeni Servisler ve Karlı Fiyatlandırmalar (Instagram, Facebook, Google ve Diğerleri)
+# Güncellenmiş Servisler (ABD çıkarıldı, İngiltere kaldı, Yıldızlar 25 artırıldı)
 SERVICES = {
-    "tr_wp": {"name": "TR WhatsApp", "code": "wa", "country": "62", "price_tl": 300, "price_stars": 150},
-    "tr_tg": {"name": "TR Telegram", "code": "tg", "country": "62", "price_tl": 200, "price_stars": 100},
-    "tr_ig": {"name": "TR Instagram", "code": "ig", "country": "62", "price_tl": 60, "price_stars": 30},
-    "tr_fb": {"name": "TR Facebook", "code": "fb", "country": "62", "price_tl": 50, "price_stars": 25},
-    "tr_go": {"name": "TR Google", "code": "go", "country": "62", "price_tl": 30, "price_stars": 15},
-    "abd_wp": {"name": "ABD WhatsApp", "code": "wa", "country": "18", "price_tl": 150, "price_stars": 75},
-    "uk_wp": {"name": "İngiltere WhatsApp", "code": "wa", "country": "16", "price_tl": 150, "price_stars": 75}
+    "tr_wp": {"name": "TR WhatsApp", "code": "wa", "country": "62", "price_tl": 300, "price_stars": 175},
+    "tr_tg": {"name": "TR Telegram", "code": "tg", "country": "62", "price_tl": 200, "price_stars": 125},
+    "tr_ig": {"name": "TR Instagram", "code": "ig", "country": "62", "price_tl": 60, "price_stars": 55},
+    "tr_fb": {"name": "TR Facebook", "code": "fb", "country": "62", "price_tl": 50, "price_stars": 50},
+    "tr_go": {"name": "TR Google", "code": "go", "country": "62", "price_tl": 30, "price_stars": 40},
+    "uk_wp": {"name": "İngiltere WhatsApp", "code": "wa", "country": "16", "price_tl": 150, "price_stars": 100}
 }
 
 def main_menu():
     keyboard = [
-        [InlineKeyboardButton("🇹🇷 TR WhatsApp — 300 TL / 150 ⭐", callback_data="serv_tr_wp")],
-        [InlineKeyboardButton("🇹🇷 TR Telegram — 200 TL / 100 ⭐", callback_data="serv_tr_tg")],
-        [InlineKeyboardButton("📸 TR Instagram — 60 TL / 30 ⭐", callback_data="serv_tr_ig")],
-        [InlineKeyboardButton("📘 TR Facebook — 50 TL / 25 ⭐", callback_data="serv_tr_fb")],
-        [InlineKeyboardButton("🌐 TR Google — 30 TL / 15 ⭐", callback_data="serv_tr_go")],
-        [InlineKeyboardButton("🇺🇸 ABD WhatsApp — 150 TL / 75 ⭐", callback_data="serv_abd_wp")],
-        [InlineKeyboardButton("🇬🇧 İngiltere WhatsApp — 150 TL / 75 ⭐", callback_data="serv_uk_wp")],
+        [InlineKeyboardButton("🇹🇷 TR WhatsApp — 300 TL / 175 ⭐", callback_data="serv_tr_wp")],
+        [InlineKeyboardButton("🇹🇷 TR Telegram — 200 TL / 125 ⭐", callback_data="serv_tr_tg")],
+        [InlineKeyboardButton("📸 TR Instagram — 60 TL / 55 ⭐", callback_data="serv_tr_ig")],
+        [InlineKeyboardButton("📘 TR Facebook — 50 TL / 50 ⭐", callback_data="serv_tr_fb")],
+        [InlineKeyboardButton("🌐 TR Google — 30 TL / 40 ⭐", callback_data="serv_tr_go")],
+        [InlineKeyboardButton("🇬🇧 İngiltere WhatsApp — 150 TL / 100 ⭐", callback_data="serv_uk_wp")],
         [InlineKeyboardButton("📞 Canlı Destek", url=f"https://t.me/{SUPPORT_USERNAME}")],
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -154,7 +152,7 @@ async def pre_checkout_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     if query.invoice_payload.startswith("sms_pay_"):
         await query.answer(ok=True)
 
-# API yanıtını detaylı kontrol eden fonksiyon
+# Gelişmiş Tekrar Deneme Mekanizması (NO_NUMBERS hatasını aşmak için)
 def fetch_real_number_with_retry(service_code, country_code):
     params = {
         "api_key": SMS_API_KEY,
@@ -164,7 +162,8 @@ def fetch_real_number_with_retry(service_code, country_code):
     }
     
     last_response = ""
-    for attempt in range(3):
+    # 5 kez deneme yaparak stok yakalama şansını maksimuma çıkarıyoruz
+    for attempt in range(5):
         try:
             response = requests.get(SMS_API_URL, params=params, timeout=15)
             last_response = response.text.strip()
@@ -176,11 +175,12 @@ def fetch_real_number_with_retry(service_code, country_code):
                 phone_number = parts[2] if len(parts) > 2 else last_response
                 return phone_number, f"Kod Bekleniyor (ID: {activation_id})"
             
-            time.sleep(2)
+            # Eğer NO_NUMBERS veya NO_BALANCE dönerse 3 saniye bekleyip tekrar denesin
+            time.sleep(3)
         except Exception as e:
             last_response = str(e)
             logging.error(f"API İstek Hatası: {last_response}")
-            time.sleep(2)
+            time.sleep(3)
             
     return None, last_response
 
