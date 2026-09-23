@@ -43,7 +43,7 @@ SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# Güncellenmiş Servisler (ABD çıkarıldı, İngiltere kaldı, Yıldızlar 25 artırıldı)
+# Güncellenmiş Servisler ve Yıldız Fiyatları
 SERVICES = {
     "tr_wp": {"name": "TR WhatsApp", "code": "wa", "country": "62", "price_tl": 300, "price_stars": 175},
     "tr_tg": {"name": "TR Telegram", "code": "tg", "country": "62", "price_tl": 200, "price_stars": 125},
@@ -152,7 +152,7 @@ async def pre_checkout_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     if query.invoice_payload.startswith("sms_pay_"):
         await query.answer(ok=True)
 
-# Gelişmiş Tekrar Deneme Mekanizması (NO_NUMBERS hatasını aşmak için)
+# Sürekli saniyeler içinde siteyi yoklayıp numara düşmesini bekleyen agresif döngü
 def fetch_real_number_with_retry(service_code, country_code):
     params = {
         "api_key": SMS_API_KEY,
@@ -162,12 +162,12 @@ def fetch_real_number_with_retry(service_code, country_code):
     }
     
     last_response = ""
-    # 5 kez deneme yaparak stok yakalama şansını maksimuma çıkarıyoruz
-    for attempt in range(5):
+    # Stok bulana kadar toplam 10 kez (aralıklı olarak) siteyi yoklar
+    for attempt in range(10):
         try:
             response = requests.get(SMS_API_URL, params=params, timeout=15)
             last_response = response.text.strip()
-            logging.info(f"API Yanıtı (Deneme {attempt+1}): {last_response}")
+            logging.info(f"Stok Sorgulama (Deneme {attempt+1}): {last_response}")
             
             if "ACCESS_NUMBER" in last_response:
                 parts = last_response.split(":")
@@ -175,12 +175,12 @@ def fetch_real_number_with_retry(service_code, country_code):
                 phone_number = parts[2] if len(parts) > 2 else last_response
                 return phone_number, f"Kod Bekleniyor (ID: {activation_id})"
             
-            # Eğer NO_NUMBERS veya NO_BALANCE dönerse 3 saniye bekleyip tekrar denesin
-            time.sleep(3)
+            # Stok yoksa 2 saniye bekleyip tekrar siteye istek atar
+            time.sleep(2)
         except Exception as e:
             last_response = str(e)
             logging.error(f"API İstek Hatası: {last_response}")
-            time.sleep(3)
+            time.sleep(2)
             
     return None, last_response
 
