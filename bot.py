@@ -43,7 +43,7 @@ SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# Servis Kodları ve Ülke Kodları (Yıldız karşılıkları eklendi: 1 Yıldız = ~2 TL hesabı ile)
+# Servis Kodları ve Ülke Kodları
 SERVICES = {
     "tr_wp": {"name": "TR WhatsApp", "code": "wa", "country": "62", "price_tl": 300, "price_stars": 150},
     "tr_tg": {"name": "TR Telegram", "code": "tg", "country": "62", "price_tl": 200, "price_stars": 100},
@@ -118,7 +118,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         service_info = SERVICES.get(service_key, SERVICES["tr_wp"])
         context.user_data["selected_service"] = service_key
 
-        # Telegram Stars Fatura Gönderimi
         title = f"SMS Onay: {service_info['name']}"
         description = f"{service_info['name']} için anında numara ve SMS aktivasyon hizmeti."
         payload = f"sms_pay_{service_key}"
@@ -144,13 +143,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=main_menu())
 
-# Yıldız Ödemesi Ön Onay
 async def pre_checkout_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.pre_checkout_query
     if query.invoice_payload.startswith("sms_pay_"):
         await query.answer(ok=True)
 
-# Doğru Country ve Service parametreleriyle siteden numara çeken fonksiyon
+# API yanıtını detaylı loglayan fonksiyon
 def fetch_real_number_with_retry(service_code, country_code):
     params = {
         "api_key": SMS_API_KEY,
@@ -164,6 +162,7 @@ def fetch_real_number_with_retry(service_code, country_code):
         try:
             response = requests.get(SMS_API_URL, params=params, timeout=15)
             last_response = response.text.strip()
+            logging.info(f"API Yanıtı (Deneme {attempt+1}): {last_response}")
             
             if "ACCESS_NUMBER" in last_response:
                 parts = last_response.split(":")
@@ -174,11 +173,11 @@ def fetch_real_number_with_retry(service_code, country_code):
             time.sleep(2)
         except Exception as e:
             last_response = str(e)
+            logging.error(f"API İstek Hatası: {last_response}")
             time.sleep(2)
             
     return "Stok Bulunamadı", f"API Yanıtı: {last_response}"
 
-# Yıldız Ödemesi Başarılı Olduğunda Numara Çekme
 async def successful_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     payment = update.message.successful_payment
     if payment.invoice_payload.startswith("sms_pay_"):
@@ -195,7 +194,7 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
             f"⚠️ Destek & Sorun Bildirimi İçin: @{SUPPORT_USERNAME}"
         )
         keyboard = [[InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]]
-        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        await update.message.reply_text(text, parse_Mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.photo or update.message.document:
@@ -226,7 +225,7 @@ def main():
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_handler))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receipt_handler))
     
-    print("ANKA VIP SMS BOT Tamamen Hazır (IBAN + Yıldız Aktif)!")
+    print("ANKA VIP SMS BOT Aktif!")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
