@@ -41,7 +41,7 @@ SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# İstediğin Servisler ve Karşılıklı Fiyatlar (country: 0 veya Türkiye için uygun kodlar)
+# Kesin ve Net İstediğin Servis Listesi (Yıldız yok, sadece TL fiyatlar)
 SERVICES = {
     "tr_wp": {"name": "🇹🇷 TR WhatsApp", "code": "wa", "country": "0", "price_tl": 300},
     "tr_tg": {"name": "🇹🇷 TR Telegram", "code": "tg", "country": "0", "price_tl": 200},
@@ -104,7 +104,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=main_menu())
 
-# Geliştirilmiş ve Hızlandırılmış Numara Çekme Fonksiyonu
 def fetch_real_number_with_retry(service_code, country_code):
     params = {
         "api_key": SMS_API_KEY,
@@ -114,7 +113,6 @@ def fetch_real_number_with_retry(service_code, country_code):
     }
     
     last_response = ""
-    # 20 kez ard arda hızlıca yoklar
     for attempt in range(20):
         try:
             response = requests.get(SMS_API_URL, params=params, timeout=10)
@@ -176,7 +174,8 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receipt_handler))
     
-    print("ANKA VIP SMS BOT Güncellendi ve Aktif!")
+    print("ANKA VIP SMS BOT Tamamen Temizlendi ve Başlatılıyor...")
+    # Eski webhook ve birikmiş güncellemeleri tamamen siler, botu sıfırdan konuşturur
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
