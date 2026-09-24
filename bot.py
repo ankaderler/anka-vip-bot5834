@@ -15,7 +15,6 @@ from telegram.ext import (
     filters,
 )
 
-# Render Port Ayarı
 PORT = int(os.environ.get("PORT", 10000))
 
 class HealthCheckHandler(http.server.SimpleHTTPRequestHandler):
@@ -30,7 +29,6 @@ def run_web_server():
 
 threading.Thread(target=run_web_server, daemon=True).start()
 
-# BOT VE API BİLGİLERİ
 BOT_TOKEN = "8966819189:AAENmHdrI8XxNexWFsaAqyfHZn7kxi0N-CQ"
 IBAN = "TR62 0006 2000 5000 0006 8107 73"
 RECIPIENT = "Resul Sakal"
@@ -41,7 +39,6 @@ SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# Kesin ve Net İstediğin Servis Listesi (Yıldız yok, sadece TL fiyatlar)
 SERVICES = {
     "tr_wp": {"name": "🇹🇷 TR WhatsApp", "code": "wa", "country": "0", "price_tl": 300},
     "tr_tg": {"name": "🇹🇷 TR Telegram", "code": "tg", "country": "0", "price_tl": 200},
@@ -113,22 +110,21 @@ def fetch_real_number_with_retry(service_code, country_code):
     }
     
     last_response = ""
-    for attempt in range(20):
+    for attempt in range(10):
         try:
             response = requests.get(SMS_API_URL, params=params, timeout=10)
             last_response = response.text.strip()
-            logging.info(f"API İstek Detayı -> Servis: {service_code}, Ülke: {country_code}, Deneme: {attempt+1}, Yanıt: {last_response}")
+            logging.info(f"API Yanıtı: {last_response}")
             
             if "ACCESS_NUMBER" in last_response:
                 parts = last_response.split(":")
                 activation_id = parts[1] if len(parts) > 1 else "Bilinmiyor"
                 phone_number = parts[2] if len(parts) > 2 else last_response
-                return phone_number, f"Kod Bekleniyor (ID: {activation_id})"
+                return phone_number, f"Numara Başarıyla Alındı (ID: {activation_id})"
             
             time.sleep(1)
         except Exception as e:
             last_response = str(e)
-            logging.error(f"API Bağlantı Hatası: {last_response}")
             time.sleep(1)
             
     return None, last_response
@@ -138,13 +134,13 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         service_key = context.user_data.get("selected_service", "tr_wp")
         service_info = SERVICES.get(service_key, SERVICES["tr_wp"])
 
-        processing_msg = await update.message.reply_text("🔄 Dekont alındı, numara hazırlanıyor...")
+        processing_msg = await update.message.reply_text("🔄 Dekont alındı, havuzdan numara çekiliyor...")
 
         assigned_number, sms_status = fetch_real_number_with_retry(service_info["code"], service_info["country"])
 
         if assigned_number:
             text = (
-                f"✅ *Dekontunuz onaylandı!*\n\n"
+                f"✅ *Dekont Onaylandı & Numara Verildi!*\n\n"
                 f"📦 Servis: *{service_info['name']}*\n"
                 f"📱 *Numara:* `{assigned_number}`\n"
                 f"💬 *Durum:* `{sms_status}`\n\n"
@@ -154,9 +150,10 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await processing_msg.edit_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
         else:
             text = (
-                "⚠️ *Anlık yoğunluk nedeniyle alternatif havuzda da numara kalmadı.*\n"
-                f"Lütfen hemen canlı destekten numaranızı isteyin:\n\n"
-                f"📞 İletişim / Destek: @{SUPPORT_USERNAME}"
+                f"✅ *Dekontunuz Onaylandı!*\n\n"
+                f"⚠️ Anlık havuzda numara bulunamadı (API Yanıtı: `{sms_status}`).\n"
+                f"Lütfen hemen canlı desteğe yazarak numaranızı anında elden teslim alın:\n\n"
+                f"📞 Canlı Destek: @{SUPPORT_USERNAME}"
             )
             keyboard = [
                 [InlineKeyboardButton("📞 Canlı Destek ile Bağlan", url=f"https://t.me/{SUPPORT_USERNAME}")],
@@ -174,8 +171,6 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receipt_handler))
     
-    print("ANKA VIP SMS BOT Tamamen Temizlendi ve Başlatılıyor...")
-    # Eski webhook ve birikmiş güncellemeleri tamamen siler, botu sıfırdan konuşturur
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
