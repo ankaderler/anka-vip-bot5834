@@ -20,7 +20,7 @@ class HealthCheckHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"ANKA VIP Ultimate SMS Bot is running perfectly!")
+        self.wfile.write(b"ANKA VIP Ultimate Bot is running perfectly!")
 
 def run_web_server():
     with socketserver.TCPServer(("", PORT), HealthCheckHandler) as httpd:
@@ -87,8 +87,23 @@ SERVICES = {
         "code": "google",
         "countries": ["turkey", "russia", "kazakhstan", "indonesia"],
         "price_tl": 30
+    },
+    "pay_turk_ifsa": {
+        "name": "🔥 Türk İfşa (5 Adet Özel VIP Kanal)",
+        "code": "vip_archive",
+        "countries": [],
+        "price_tl": 300
     }
 }
+
+# Müşteriye ödeme onayından sonra verilecek tıklanabilir mavi özel arşiv bağlantıları
+VIP_ARCHIVE_LINKS = [
+    "🔗 [VIP Kanal 1'e Katıl](https://t.me/+Aqi4UqSzr4JjZmRk)",
+    "🔗 [VIP Kanal 2'ye Katıl](https://t.me/+H2z-xlyZ6zM0OTE0)",
+    "🔗 [VIP Kanal 3'e Katıl](https://t.me/+p01bQp6XebkzMmI0)",
+    "🔗 [VIP Kanal 4'e Katıl](https://t.me/+HqtuwLtoMkkwMWQ0)",
+    "🔗 [VIP Kanal 5'e Katıl](https://t.me/+BcHhS86B9ocyMWQ0)"
+]
 
 def main_menu():
     keyboard = []
@@ -100,8 +115,8 @@ def main_menu():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         text = (
-            "💎 *ANKA VIP — PREMIUM SMS ONAY SERVİSİ*\n\n"
-            "⚡ Kesintisiz Otomatik Numara Tedariği\n"
+            "💎 *ANKA VIP — PREMIUM HİZMET MERKEZİ*\n\n"
+            "⚡ Kesintisiz Otomatik Numara & Arşiv Tedariği\n"
             "Aşağıdaki menüden almak istediğiniz güvenli servisi seçebilirsiniz."
         )
         if update.message:
@@ -115,7 +130,7 @@ async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     try:
         if update.message and update.message.text:
             text = (
-                "💎 *ANKA VIP — PREMIUM SMS ONAY SERVİSİ*\n\n"
+                "💎 *ANKA VIP — PREMIUM HİZMET MERKEZİ*\n\n"
                 "⚡ Lütfen menüden bir servis seçin veya ödeme dekontunuzu (fotoğraf/dosya) doğrudan gönderin."
             )
             await update.message.reply_text(text, parse_mode="Markdown", reply_markup=main_menu())
@@ -134,10 +149,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             context.user_data["selected_service"] = service_key
 
+            extra_info = ""
+            if service_key == "pay_turk_ifsa":
+                extra_info = "\n📌 *Bilgilendirme:* Bu paketi satın aldığınızda anında **5 adet Türk İfşa kanalı** otomatik olarak teslim edilecektir.\n\n"
+
             text = (
                 f"💳 *IBAN İLE ÖDEME EKRANI*\n\n"
                 f"📦 Ürün: *{service_info['name']}*\n"
                 f"💰 Tutar: *{service_info['price_tl']} TL*\n\n"
+                f"{extra_info}"
                 f"IBAN:\n`{IBAN}`\n\n"
                 f"Alıcı: *{RECIPIENT}*\n\n"
                 "━━━━━━━━━━━━━━━━\n"
@@ -145,7 +165,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "2️⃣ Ödeme yaptıktan sonra banka dekontunun ekran görüntüsünü veya dosyasını **doğrudan bu sohbete gönderin**."
             )
             keyboard = [[InlineKeyboardButton("⬅️ Geri", callback_data="home")]]
-            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=main_menu() if service_key == "home" else InlineKeyboardMarkup(keyboard))
 
         elif data.startswith("refresh_num_"):
             service_key = data.replace("refresh_num_", "")
@@ -185,8 +205,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         elif data == "home":
             text = (
-                "💎 *ANKA VIP — PREMIUM SMS ONAY SERVİSİ*\n\n"
-                "⚡ Kesintisiz Otomatik Numara Tedariği\n"
+                "💎 *ANKA VIP — PREMIUM HİZMET MERKEZİ*\n\n"
+                "⚡ Kesintisiz Otomatik Numara & Arşiv Tedariği\n"
                 "Aşağıdaki menüden almak istediğiniz güvenli servisi seçebilirsiniz."
             )
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=main_menu())
@@ -223,8 +243,24 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             service_key = context.user_data.get("selected_service", "ph_wp")
             service_info = SERVICES.get(service_key, SERVICES["ph_wp"])
 
-            processing_msg = await update.message.reply_text("🔄 Dekont onaylandı, küresel stok havuzları taranıyor...")
+            processing_msg = await update.message.reply_text("🔍 *ANKA VIP:* Dekontunuz yapay zeka ile taranıyor ve doğrulanıyor...")
 
+            # Eğer Türk İfşa arşivi seçildiyse doğrudan tıklanabilir 5 adet kanalı teslim et
+            if service_key == "pay_turk_ifsa":
+                links_formatted = "\n".join(VIP_ARCHIVE_LINKS)
+                text = (
+                    "✅ *ÖDEMENİZ ONAYLANDI — VIP ERİŞİM SAĞLANDI!*\n\n"
+                    f"📦 Ürün: *{service_info['name']}*\n"
+                    f"💵 Tutar: *{service_info['price_tl']} TL*\n\n"
+                    "🎉 Başarıyla **5 adet Türk İfşa kanalı** satın aldınız. Aşağıdaki mavi bağlantılara tıklayarak kanallara anında giriş yapabilirsiniz:\n\n"
+                    f"{links_formatted}\n\n"
+                    "⚠️ *Not:* Bağlantıları kaybetmemek için lütfen güvenli bir yere kaydediniz."
+                )
+                keyboard = [[InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]]
+                await processing_msg.edit_text(text, parse_mode="Markdown", disable_web_page_preview=True, reply_markup=InlineKeyboardMarkup(keyboard))
+                return
+
+            # SMS numarası servisi seçildiyse API'den numara çek
             number, activation_id, country_used = await fetch_number_with_fallback(service_info["code"], service_info["countries"])
 
             if number:
@@ -245,7 +281,7 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 text = (
                     f"✅ *Dekontunuz Onaylandı!*\n\n"
-                    f"⚠️ Siteye (API) anlık olarak bağlanılamadı veya havuzda yoğunluk var.\n"
+                    f"⚠️ SMS API havuzunda anlık yoğunluk var.\n"
                     f"Lütfen dekontunuzla birlikte canlı desteğe yazın, hemen manuel verilsin:\n\n"
                     f"📞 Canlı Destek: @{SUPPORT_USERNAME}"
                 )
