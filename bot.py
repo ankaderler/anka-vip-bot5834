@@ -33,12 +33,13 @@ IBAN = "TR62 0006 2000 5000 0006 8107 73"
 RECIPIENT = "Resul Sakal"
 SUPPORT_USERNAME = "SMSPATRONUM"
 
-SMS_API_KEY = "osms_1a63dee621f99dd7a01b8082b0de694c23a822dce4a24225"
+# Güncel ve Yeni API Anahtarın
+SMS_API_KEY = "osms_ff02e69d0bdd0ddf9106b60644059c77df21bb3b5a738a9e"
 SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# Onaylasms API standartlarına tam uyumlu güncel servis ve ülke kodları
+# Onaylasms API standartlarına tam uyumlu servis ve ülke parametreleri
 SERVICES = {
     "tr_wp": {"name": "🇹🇷 TR WhatsApp", "code": "whatsapp", "country": "turkey", "price_tl": 300},
     "tr_tg": {"name": "🇹🇷 TR Telegram", "code": "telegram", "country": "turkey", "price_tl": 200},
@@ -174,7 +175,7 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receipt_handler))
     
-    print("ANKA VIP SMS BOT Tam Uyumlu Sürümle Başlatıldı!")
+    print("ANKA VIP SMS BOT Yeni API ile Başlatıldı!")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
