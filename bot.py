@@ -3,8 +3,8 @@ import threading
 import http.server
 import socketserver
 import logging
-import time
-import requests
+import asyncio
+import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -21,7 +21,7 @@ class HealthCheckHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"ANKA VIP SMS Bot is active!")
+        self.wfile.write(b"ANKA VIP SMS Bot is live and running smoothly!")
 
 def run_web_server():
     with socketserver.TCPServer(("", PORT), HealthCheckHandler) as httpd:
@@ -67,7 +67,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message:
         await update.message.reply_text(text, parse_mode="Markdown", reply_markup=main_menu())
     elif update.callback_query:
-        await update.callback_query.message.edit_text(text, parse_Mode="Markdown", reply_markup=main_menu())
+        await update.callback_query.message.edit_text(text, parse_mode="Markdown", reply_markup=main_menu())
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -101,7 +101,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=main_menu())
 
-def fetch_real_number(service_code, country_code):
+async def fetch_real_number_async(service_code, country_code):
     params = {
         "api_key": SMS_API_KEY,
         "action": "getNumber",
@@ -109,22 +109,22 @@ def fetch_real_number(service_code, country_code):
         "country": country_code
     }
     
-    try:
-        # Sitenin donmasını önlemek için timeout süresini 5 saniyeye sabitledik
-        response = requests.get(SMS_API_URL, params=params, timeout=5)
-        res_text = response.text.strip()
-        logging.info(f"API Yanıtı: {res_text}")
-        
-        if "ACCESS_NUMBER" in res_text:
-            parts = res_text.split(":")
-            activation_id = parts[1] if len(parts) > 1 else "Bilinmiyor"
-            phone_number = parts[2] if len(parts) > 2 else res_text
-            return phone_number, activation_id
-        else:
-            return None, res_text
-    except Exception as e:
-        logging.error(f"API Bağlantı Hatası: {e}")
-        return None, "TIMEOUT_OR_CONNECTION_ERROR"
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.get(SMS_API_URL, params=params)
+            res_text = response.text.strip()
+            logging.info(f"API Asenkron Yanıtı: {res_text}")
+            
+            if "ACCESS_NUMBER" in res_text:
+                parts = res_text.split(":")
+                activation_id = parts[1] if len(parts) > 1 else "Bilinmiyor"
+                phone_number = parts[2] if len(parts) > 2 else res_text
+                return phone_number, activation_id
+            else:
+                return None, res_text
+        except Exception as e:
+            logging.error(f"API İstinasi Hatası: {e}")
+            return None, "CONNECTION_TIMEOUT"
 
 async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.photo or update.message.document:
@@ -133,7 +133,8 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         processing_msg = await update.message.reply_text("🔄 Dekont onaylandı, numara alınıyor...")
 
-        number, info = fetch_real_number(service_info["code"], service_info["country"])
+        # Asenkron olarak numara çekilir, bot kesinlikle kilitlenmez
+        number, info = await fetch_real_number_async(service_info["code"], service_info["country"])
 
         if number:
             text = (
@@ -148,8 +149,8 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             text = (
                 f"✅ *Dekontunuz Onaylandı!*\n\n"
-                f"⚠️ Sunucudan numara alınamadı (Yanıt: `{info}`).\n"
-                f"Müşterimizin mağdur olmaması için lütfen dekontunuzla birlikte hemen canlı desteğe yazın, numaranız anında manuel verilsin:\n\n"
+                f"⚠️ Numara havuz durumu: `{info}`\n"
+                f"Lütfen dekontunuzla birlikte hemen canlı desteğe yazın, numaranız anında manuel verilsin:\n\n"
                 f"📞 Canlı Destek: @{SUPPORT_USERNAME}"
             )
             keyboard = [
@@ -162,6 +163,8 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📸 Lütfen geçerli bir banka dekontu gönderin.")
 
 def main():
+    # Webhook temizliği
+    import requests
     try:
         requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook?drop_pending_updates=true", timeout=5)
     except:
@@ -173,7 +176,7 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receipt_handler))
     
-    print("ANKA VIP SMS BOT Kararlı Sürüm Başlatıldı!")
+    print("ANKA VIP SMS BOT Kaymak Gibi Akıcı Sürümle Başlatıldı!")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
