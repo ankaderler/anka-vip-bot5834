@@ -39,6 +39,15 @@ SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
+# Telegram sunucusundaki eski ve zararlı Webhook bağlantısını kalıcı olarak temizler
+def clear_telegram_webhook():
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook?drop_pending_updates=true"
+    try:
+        response = requests.get(url, timeout=10)
+        logging.info(f"Webhook Temizleme Yanıtı: {response.text}")
+    except Exception as e:
+        logging.error(f"Webhook temizlenirken hata oluştu: {e}")
+
 SERVICES = {
     "tr_wp": {"name": "🇹🇷 TR WhatsApp", "code": "wa", "country": "0", "price_tl": 300},
     "tr_tg": {"name": "🇹🇷 TR Telegram", "code": "tg", "country": "0", "price_tl": 200},
@@ -165,12 +174,16 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📸 Lütfen geçerli bir banka dekontu görseli veya belgesi gönderin.")
 
 def main():
+    # Bot başlatılmadan önce Telegram sunucusundaki eski yabancı webhook'u temizle
+    clear_telegram_webhook()
+
     app = Application.builder().token(BOT_TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receipt_handler))
     
+    print("ANKA VIP SMS BOT Webhook temizlendi ve başlatılıyor...")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
