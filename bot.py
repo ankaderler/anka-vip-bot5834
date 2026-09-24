@@ -20,7 +20,7 @@ class HealthCheckHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"ANKA VIP Ultimate SMS Bot is running!")
+        self.wfile.write(b"ANKA VIP Ultimate SMS Bot is running perfectly!")
 
 def run_web_server():
     with socketserver.TCPServer(("", PORT), HealthCheckHandler) as httpd:
@@ -38,7 +38,7 @@ SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# Tüm Servisler ve Küresel Akıllı Ülke Havuzları (Stok sorununun yaşanmaması için genişletildi)
+# Eksiksiz Ürün Listesi ve Genişletilmiş Küresel Stok Havuzları
 SERVICES = {
     "ph_wp": {
         "name": "🔥 Filipinler WhatsApp (En Çok Satan - %0 Risk)",
@@ -109,7 +109,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif update.callback_query:
             await update.callback_query.message.edit_text(text, parse_mode="Markdown", reply_markup=main_menu())
     except Exception as e:
-        logging.error(f"Start hatası: {e}")
+        logging.error(f"Start komutu hatası: {e}")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -197,7 +197,6 @@ async def fetch_number_with_fallback(service_code, countries_list):
                 res_text = response.text.strip()
                 logging.info(f"API İstek [{service_code} - {country}] Yanıt: {res_text}")
                 
-                # API yanıtında ACCESS_NUMBER geçiyorsa başarılıdır
                 if "ACCESS_NUMBER" in res_text:
                     parts = res_text.split(":")
                     activation_id = parts[1] if len(parts) > 1 else "Bilinmiyor"
@@ -254,10 +253,12 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     import requests
+    # Telegram tarafındaki eski takılı kalan webhook ve çakışmaları tamamen temizler
     try:
         requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook?drop_pending_updates=true", timeout=5)
-    except:
-        pass
+        logging.info("Telegram Webhook başarıyla sıfırlandı.")
+    except Exception as e:
+        logging.error(f"Webhook sıfırlama hatası: {e}")
 
     app = Application.builder().token(BOT_TOKEN).build()
     
@@ -265,7 +266,7 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receipt_handler))
     
-    print("ANKA VIP Küresel Havuz ve Yurt Dışı Telegram Botu Başlatıldı!")
+    print("ANKA VIP Ürün Menüsü ve Küresel Stok Botu Aktif!")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
