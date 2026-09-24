@@ -28,7 +28,8 @@ def run_web_server():
 
 threading.Thread(target=run_web_server, daemon=True).start()
 
-BOT_TOKEN = "8874989367:AAE4ARinymcurNpCG9gF3hBrR0cKIoAP8aA"
+# Yeni Token Entegre Edildi
+BOT_TOKEN = "8874989367:AAEMt5Iqt6jOUofGIEflzyA02BhkfOookKM"
 IBAN = "TR62 0006 2000 5000 0006 8107 73"
 RECIPIENT = "Resul Sakal"
 SUPPORT_USERNAME = "SMSPATRONUM"
@@ -38,7 +39,7 @@ SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# Eksiksiz Ürün Listesi ve Genişletilmiş Küresel Stok Havuzları
+# Eksiksiz Ürün Listesi ve Küresel Stok Havuzları
 SERVICES = {
     "ph_wp": {
         "name": "🔥 Filipinler WhatsApp (En Çok Satan - %0 Risk)",
@@ -173,7 +174,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
             else:
                 text = (
-                    f"⚠️ *Şu an alternatif havuzlarda yoğunluk var.*\n\n"
+                    f"⚠️ *Şu an API sitesine bağlanılamıyor veya stok bulunamadı.*\n\n"
                     f"Lütfen hemen canlı desteğe bildirin, anında manuel numara verilsin:\n\n"
                     f"📞 Canlı Destek: @{SUPPORT_USERNAME}"
                 )
@@ -195,7 +196,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Buton işleme hatası: {e}")
 
 async def fetch_number_with_fallback(service_code, countries_list):
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    """API bağlantı hatalarını ve siteye bağlanamama sorunlarını tolere eden güvenli küresel arama motoru"""
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as client:
         for country in countries_list:
             params = {
                 "api_key": SMS_API_KEY,
@@ -213,8 +216,10 @@ async def fetch_number_with_fallback(service_code, countries_list):
                     activation_id = parts[1] if len(parts) > 1 else "Bilinmiyor"
                     phone_number = parts[2] if len(parts) > 2 else res_text
                     return phone_number, activation_id, country
+            except httpx.RequestError as e:
+                logging.error(f"API Bağlantı Hatası (Siteye Erişilemiyor) [{country}]: {e}")
             except Exception as e:
-                logging.error(f"API Bağlantı Hatası ({country}): {e}")
+                logging.error(f"Beklenmeyen API Hatası [{country}]: {e}")
         
         return None, None, None
 
@@ -246,7 +251,7 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 text = (
                     f"✅ *Dekontunuz Onaylandı!*\n\n"
-                    f"⚠️ Küresel havuzda anlık yoğunluk yaşandı.\n"
+                    f"⚠️ Siteye (API) anlık olarak bağlanılamadı veya havuzda yoğunluk var.\n"
                     f"Lütfen dekontunuzla birlikte canlı desteğe yazın, hemen manuel verilsin:\n\n"
                     f"📞 Canlı Destek: @{SUPPORT_USERNAME}"
                 )
@@ -261,10 +266,9 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     import requests
-    # Telegram'daki eski webhook çakışmalarını ve dışarıdan kalan tüm askı süreçlerini sıfırlar
     try:
         requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook?drop_pending_updates=true", timeout=5)
-        logging.info("Webhook ve bekleyen güncellemeler başarıyla temizlendi.")
+        logging.info("Yeni Token ile Webhook başarıyla sıfırlandı.")
     except Exception as e:
         logging.error(f"Webhook sıfırlama hatası: {e}")
 
@@ -273,9 +277,9 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receipt_handler))
-    app.add_handler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, text_message_handler)
+    app.add_handler(MessageHandler(filters.CHAT & filters.TEXT & ~filters.COMMAND, text_message_handler))
     
-    print("ANKA VIP Bot Kesintisiz Çalıştırılıyor!")
+    print("ANKA VIP Yeni Token ile Aktif Edildi!")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
