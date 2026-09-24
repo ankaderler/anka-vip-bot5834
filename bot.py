@@ -34,7 +34,7 @@ IBAN = "TR62 0006 2000 5000 0006 8107 73"
 RECIPIENT = "Resul Sakal"
 SUPPORT_USERNAME = "SMSPATRONUM"
 
-SMS_API_KEY = "osms_ff02e69d0bdd0ddf9106b60644059c77df21bb3b5a738a9e"
+SMS_API_KEY = "osms_654ba30f923e5f40b693b3270c1817a31bd550f6ad04f8c9"
 SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
