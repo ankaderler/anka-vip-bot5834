@@ -111,6 +111,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logging.error(f"Start komutu hatası: {e}")
 
+async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Dekont haricinde yazı yazıldığında kullanıcıya direkt ana menüyü gösterir"""
+    try:
+        if update.message and update.message.text:
+            text = (
+                "💎 *ANKA VIP — PREMIUM SMS ONAY SERVİSİ*\n\n"
+                "⚡ Kesintisiz Otomatik Numara Tedariği\n"
+                "Aşağıdaki menüden almak istediğiniz güvenli servisi seçebilirsiniz."
+            )
+            await update.message.reply_text(text, parse_mode="Markdown", reply_markup=main_menu())
+    except Exception as e:
+        logging.error(f"Metin mesajı işleme hatası: {e}")
+
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         query = update.callback_query
@@ -245,15 +258,12 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ]
                 await processing_msg.edit_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
             return
-
-        if update.message:
-            await update.message.reply_text("📸 Lütfen geçerli bir banka dekontu gönderin.")
     except Exception as e:
         logging.error(f"Dekont işleme hatası: {e}")
 
 def main():
     import requests
-    # Telegram tarafındaki eski takılı kalan webhook ve çakışmaları tamamen temizler
+    # Telegram tarafındaki eski webhook'ları ve bekleyen güncellemeleri tamamen temizler
     try:
         requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook?drop_pending_updates=true", timeout=5)
         logging.info("Telegram Webhook başarıyla sıfırlandı.")
@@ -265,6 +275,8 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receipt_handler))
+    # Dekont harici herhangi bir yazı yazıldığında da menüyü açar
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message_handler))
     
     print("ANKA VIP Ürün Menüsü ve Küresel Stok Botu Aktif!")
     app.run_polling(drop_pending_updates=True)
