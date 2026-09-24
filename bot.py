@@ -20,7 +20,7 @@ class HealthCheckHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"ANKA VIP Smart SMS Bot is live!")
+        self.wfile.write(b"ANKA VIP Ultimate SMS Bot is running!")
 
 def run_web_server():
     with socketserver.TCPServer(("", PORT), HealthCheckHandler) as httpd:
@@ -38,25 +38,43 @@ SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# Servisler ve akıllı ülke havuzları (Stok yoksa sıradakini dener)
+# İstediğin Tüm Servisler ve Alternatif Geniş Ülke Havuzları (Stok bulana kadar sırayla dener)
 SERVICES = {
     "ph_wp": {
-        "name": "🔥 Filipinler WhatsApp (En Çok Satın Alınan - %0 Patlama Riskli)",
+        "name": "🔥 Filipinler WhatsApp (En Çok Satan - %0 Risk)",
         "code": "whatsapp",
-        "countries": ["philippines", "indonesia", "vietnam", "malaysia", "russia"], # Otomatik yedek ülke tarama havuzu
+        "countries": ["philippines", "indonesia", "vietnam", "malaysia", "russia", "kazakhstan"],
         "price_tl": 200
+    },
+    "uk_wp": {
+        "name": "🇬🇧 İngiltere WhatsApp",
+        "code": "whatsapp",
+        "countries": ["uk", "england", "russia", "romania", "poland"],
+        "price_tl": 150
     },
     "tr_tg": {
         "name": "🇹🇷 TR Telegram",
         "code": "telegram",
-        "countries": ["turkey", "russia", "kazakhstan"],
+        "countries": ["turkey", "russia", "kazakhstan", "ukraine"],
         "price_tl": 200
     },
-    "tr_wp": {
-        "name": "🇹🇷 TR WhatsApp",
-        "code": "whatsapp",
-        "countries": ["turkey"],
-        "price_tl": 300
+    "tr_ig": {
+        "name": "📸 TR Instagram",
+        "code": "instagram",
+        "countries": ["turkey", "russia", "indonesia"],
+        "price_tl": 60
+    },
+    "tr_fb": {
+        "name": "📘 TR Facebook",
+        "code": "facebook",
+        "countries": ["turkey", "russia", "vietnam"],
+        "price_tl": 50
+    },
+    "tr_go": {
+        "name": "🌐 TR Google / Gmail",
+        "code": "google",
+        "countries": ["turkey", "russia", "kazakhstan", "indonesia"],
+        "price_tl": 30
     }
 }
 
@@ -107,11 +125,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
         elif data.startswith("refresh_num_"):
-            # Müşteri "Numarayı Değiştir / Yenile" butonuna bastığında çalışır
             service_key = data.replace("refresh_num_", "")
             service_info = SERVICES.get(service_key, SERVICES["ph_wp"])
             
-            await query.edit_message_text("🔄 Yeni numara aranıyor, lütfen bekleyin...")
+            await query.edit_message_text("🔄 Alternatif havuzlar taranıyor, yeni numara aranıyor...")
             
             number, activation_id, country_used = await fetch_number_with_fallback(service_info["code"], service_info["countries"])
             
@@ -154,7 +171,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Buton işleme hatası: {e}")
 
 async def fetch_number_with_fallback(service_code, countries_list):
-    """Ülke listesini sırayla dener, stok bulunan ilk ülkeden numarayı çeker"""
+    """Genişletilmiş ülke listesini sırayla dener, stok bulunan ilk ülkeden numarayı çeker"""
     async with httpx.AsyncClient(timeout=15.0) as client:
         for country in countries_list:
             params = {
@@ -166,7 +183,7 @@ async def fetch_number_with_fallback(service_code, countries_list):
             try:
                 response = await client.get(SMS_API_URL, params=params)
                 res_text = response.text.strip()
-                logging.info(f"Ülke denemesi [{country}]: {res_text}")
+                logging.info(f"API İstek [{service_code} - {country}] Yanıt: {res_text}")
                 
                 if "ACCESS_NUMBER" in res_text:
                     parts = res_text.split(":")
@@ -184,7 +201,7 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             service_key = context.user_data.get("selected_service", "ph_wp")
             service_info = SERVICES.get(service_key, SERVICES["ph_wp"])
 
-            processing_msg = await update.message.reply_text("🔄 Dekont onaylandı, aktif stoklar taranıyor...")
+            processing_msg = await update.message.reply_text("🔄 Dekont onaylandı, küresel stok havuzları taranıyor...")
 
             number, activation_id, country_used = await fetch_number_with_fallback(service_info["code"], service_info["countries"])
 
@@ -196,7 +213,7 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"🌍 Bölge/Ülke: `{country_used.upper()}`\n"
                     f"📱 *Numara:* `{number}`\n"
                     f"🆔 *İşlem ID:* `{activation_id}`\n\n"
-                    f"⚠️ Kod gelmezse aşağıdaki **'Numarayı Değiştir'** butonunu kullanabilirsiniz."
+                    f"⚠️ Kod gelmezse aşağıdaki **'Numarayı Değiştir / Yenile'** butonunu kullanabilirsiniz."
                 )
                 keyboard = [
                     [InlineKeyboardButton("🔄 Numarayı Değiştir / Yenile", callback_data=f"refresh_num_{service_key}")],
@@ -206,7 +223,7 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 text = (
                     f"✅ *Dekontunuz Onaylandı!*\n\n"
-                    f"⚠️ Şuan otomatik havuzda geçici yoğunluk var.\n"
+                    f"⚠️ Otomatik havuzda geçici bir yoğunluk yaşandı.\n"
                     f"Lütfen dekontunuzla birlikte canlı desteğe yazın, hemen manuel verilsin:\n\n"
                     f"📞 Canlı Destek: @{SUPPORT_USERNAME}"
                 )
@@ -235,7 +252,7 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receipt_handler))
     
-    print("ANKA VIP Akıllı Stok ve Numara Yenileme Botu Başlatıldı!")
+    print("ANKA VIP Küresel Havuz ve Çoklu Servis Botu Başlatıldı!")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
