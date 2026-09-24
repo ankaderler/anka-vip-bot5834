@@ -3,7 +3,6 @@ import threading
 import http.server
 import socketserver
 import logging
-import asyncio
 import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -39,16 +38,17 @@ SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
+# Onaylasms API standartlarına tam uyumlu güncel servis ve ülke kodları
 SERVICES = {
-    "tr_wp": {"name": "🇹🇷 TR WhatsApp", "code": "wa", "country": "0", "price_tl": 300},
-    "tr_tg": {"name": "🇹🇷 TR Telegram", "code": "tg", "country": "0", "price_tl": 200},
-    "tr_ig": {"name": "📸 TR Instagram", "code": "ig", "country": "0", "price_tl": 60},
-    "tr_fb": {"name": "📘 TR Facebook", "code": "fb", "country": "0", "price_tl": 50},
-    "tr_go": {"name": "🌐 TR Google", "code": "go", "country": "0", "price_tl": 30},
-    "uk_wp": {"name": "🇬🇧 İngiltere WhatsApp", "code": "wa", "country": "16", "price_tl": 150},
-    "tr_dc": {"name": "🎮 TR Discord", "code": "dc", "country": "0", "price_tl": 75},
-    "tr_tw": {"name": "🐦 TR Twitter / X", "code": "tw", "country": "0", "price_tl": 70},
-    "tr_sn": {"name": "👻 TR Snapchat", "code": "sn", "country": "0", "price_tl": 90}
+    "tr_wp": {"name": "🇹🇷 TR WhatsApp", "code": "whatsapp", "country": "turkey", "price_tl": 300},
+    "tr_tg": {"name": "🇹🇷 TR Telegram", "code": "telegram", "country": "turkey", "price_tl": 200},
+    "tr_ig": {"name": "📸 TR Instagram", "code": "instagram", "country": "turkey", "price_tl": 60},
+    "tr_fb": {"name": "📘 TR Facebook", "code": "facebook", "country": "turkey", "price_tl": 50},
+    "tr_go": {"name": "🌐 TR Google", "code": "google", "country": "turkey", "price_tl": 30},
+    "uk_wp": {"name": "🇬🇧 İngiltere WhatsApp", "code": "whatsapp", "country": "uk", "price_tl": 150},
+    "tr_dc": {"name": "🎮 TR Discord", "code": "discord", "country": "turkey", "price_tl": 75},
+    "tr_tw": {"name": "🐦 TR Twitter / X", "code": "twitter", "country": "turkey", "price_tl": 70},
+    "tr_sn": {"name": "👻 TR Snapchat", "code": "snapchat", "country": "turkey", "price_tl": 90}
 }
 
 def main_menu():
@@ -109,11 +109,11 @@ async def fetch_real_number_async(service_code, country_code):
         "country": country_code
     }
     
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(timeout=15.0) as client:
         try:
             response = await client.get(SMS_API_URL, params=params)
             res_text = response.text.strip()
-            logging.info(f"API Asenkron Yanıtı: {res_text}")
+            logging.info(f"API Yanıtı: {res_text} | Parametreler: {params}")
             
             if "ACCESS_NUMBER" in res_text:
                 parts = res_text.split(":")
@@ -123,8 +123,8 @@ async def fetch_real_number_async(service_code, country_code):
             else:
                 return None, res_text
         except Exception as e:
-            logging.error(f"API İstinasi Hatası: {e}")
-            return None, "CONNECTION_TIMEOUT"
+            logging.error(f"API Bağlantı Hatası: {e}")
+            return None, "CONNECTION_ERROR"
 
 async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.photo or update.message.document:
@@ -133,7 +133,6 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         processing_msg = await update.message.reply_text("🔄 Dekont onaylandı, numara alınıyor...")
 
-        # Asenkron olarak numara çekilir, bot kesinlikle kilitlenmez
         number, info = await fetch_real_number_async(service_info["code"], service_info["country"])
 
         if number:
@@ -149,7 +148,7 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             text = (
                 f"✅ *Dekontunuz Onaylandı!*\n\n"
-                f"⚠️ Numara havuz durumu: `{info}`\n"
+                f"⚠️ API Yanıtı: `{info}`\n"
                 f"Lütfen dekontunuzla birlikte hemen canlı desteğe yazın, numaranız anında manuel verilsin:\n\n"
                 f"📞 Canlı Destek: @{SUPPORT_USERNAME}"
             )
@@ -163,7 +162,6 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📸 Lütfen geçerli bir banka dekontu gönderin.")
 
 def main():
-    # Webhook temizliği
     import requests
     try:
         requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook?drop_pending_updates=true", timeout=5)
@@ -176,7 +174,7 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receipt_handler))
     
-    print("ANKA VIP SMS BOT Kaymak Gibi Akıcı Sürümle Başlatıldı!")
+    print("ANKA VIP SMS BOT Tam Uyumlu Sürümle Başlatıldı!")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
