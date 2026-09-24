@@ -20,7 +20,7 @@ class HealthCheckHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"ANKA VIP SMS Bot is live and running smoothly!")
+        self.wfile.write(b"ANKA VIP SMS Bot is secure and running!")
 
 def run_web_server():
     with socketserver.TCPServer(("", PORT), HealthCheckHandler) as httpd:
@@ -28,18 +28,17 @@ def run_web_server():
 
 threading.Thread(target=run_web_server, daemon=True).start()
 
-BOT_TOKEN = "8966819189:AAHjsR8eLkkdxpK4GjCUt7mdzBcFVnagi4Q"
+# Yeni Güvenli Bot Tokeni
+BOT_TOKEN = "8874989367:AAE4ARinymcurNpCG9gF3hBrR0cKIoAP8aA"
 IBAN = "TR62 0006 2000 5000 0006 8107 73"
 RECIPIENT = "Resul Sakal"
 SUPPORT_USERNAME = "SMSPATRONUM"
 
-# Güncel ve Yeni API Anahtarın
 SMS_API_KEY = "osms_ff02e69d0bdd0ddf9106b60644059c77df21bb3b5a738a9e"
 SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# Onaylasms API standartlarına tam uyumlu servis ve ülke parametreleri
 SERVICES = {
     "tr_wp": {"name": "🇹🇷 TR WhatsApp", "code": "whatsapp", "country": "turkey", "price_tl": 300},
     "tr_tg": {"name": "🇹🇷 TR Telegram", "code": "telegram", "country": "turkey", "price_tl": 200},
@@ -60,47 +59,53 @@ def main_menu():
     return InlineKeyboardMarkup(keyboard)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = (
-        "💎 *ANKA VIP — SMS ONAY SERVİSİ*\n\n"
-        "⚡ Güvenli ve Hızlı Numara Tedariği\n"
-        "Aşağıdaki menüden almak istediğiniz servisi seçerek ödeme adımına geçebilirsiniz."
-    )
-    if update.message:
-        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=main_menu())
-    elif update.callback_query:
-        await update.callback_query.message.edit_text(text, parse_mode="Markdown", reply_markup=main_menu())
-
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    data = query.data
-
-    if data.startswith("iban_"):
-        service_key = data.replace("iban_", "")
-        service_info = SERVICES.get(service_key, SERVICES["tr_wp"])
-        
-        context.user_data["selected_service"] = service_key
-
-        text = (
-            f"💳 *IBAN İLE ÖDEME EKRANI*\n\n"
-            f"📦 Paket: *{service_info['name']}*\n"
-            f"💰 Tutar: *{service_info['price_tl']} TL*\n\n"
-            f"IBAN:\n`{IBAN}`\n\n"
-            f"Alıcı: *{RECIPIENT}*\n\n"
-            "━━━━━━━━━━━━━━━━\n"
-            f"1️⃣ Yukarıdaki hesaba tam *{service_info['price_tl']} TL* gönderin.\n"
-            "2️⃣ Ödeme yaptıktan sonra banka dekontunun ekran görüntüsünü veya dosyasını **doğrudan bu sohbete gönderin**."
-        )
-        keyboard = [[InlineKeyboardButton("⬅️ Geri", callback_data="home")]]
-        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif data == "home":
+    try:
         text = (
             "💎 *ANKA VIP — SMS ONAY SERVİSİ*\n\n"
             "⚡ Güvenli ve Hızlı Numara Tedariği\n"
-            "Aşağıdaki menüden almak istediğiniz servisi seçebilirsiniz."
+            "Aşağıdaki menüden almak istediğiniz servisi seçerek ödeme adımına geçebilirsiniz."
         )
-        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=main_menu())
+        if update.message:
+            await update.message.reply_text(text, parse_mode="Markdown", reply_markup=main_menu())
+        elif update.callback_query:
+            await update.callback_query.message.edit_text(text, parse_mode="Markdown", reply_markup=main_menu())
+    except Exception as e:
+        logging.error(f"Start komutu hatası: {e}")
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        query = update.callback_query
+        await query.answer()
+        data = query.data
+
+        if data.startswith("iban_"):
+            service_key = data.replace("iban_", "")
+            service_info = SERVICES.get(service_key, SERVICES["tr_wp"])
+            
+            context.user_data["selected_service"] = service_key
+
+            text = (
+                f"💳 *IBAN İLE ÖDEME EKRANI*\n\n"
+                f"📦 Paket: *{service_info['name']}*\n"
+                f"💰 Tutar: *{service_info['price_tl']} TL*\n\n"
+                f"IBAN:\n`{IBAN}`\n\n"
+                f"Alıcı: *{RECIPIENT}*\n\n"
+                "━━━━━━━━━━━━━━━━\n"
+                f"1️⃣ Yukarıdaki hesaba tam *{service_info['price_tl']} TL* gönderin.\n"
+                "2️⃣ Ödeme yaptıktan sonra banka dekontunun ekran görüntüsünü veya dosyasını **doğrudan bu sohbete gönderin**."
+            )
+            keyboard = [[InlineKeyboardButton("⬅️ Geri", callback_data="home")]]
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+        elif data == "home":
+            text = (
+                "💎 *ANKA VIP — SMS ONAY SERVİSİ*\n\n"
+                "⚡ Güvenli ve Hızlı Numara Tedariği\n"
+                "Aşağıdaki menüden almak istediğiniz servisi seçebilirsiniz."
+            )
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=main_menu())
+    except Exception as e:
+        logging.error(f"Buton işleme hatası: {e}")
 
 async def fetch_real_number_async(service_code, country_code):
     params = {
@@ -128,39 +133,43 @@ async def fetch_real_number_async(service_code, country_code):
             return None, "CONNECTION_ERROR"
 
 async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.photo or update.message.document:
-        service_key = context.user_data.get("selected_service", "tr_wp")
-        service_info = SERVICES.get(service_key, SERVICES["tr_wp"])
+    try:
+        if update.message and (update.message.photo or update.message.document):
+            service_key = context.user_data.get("selected_service", "tr_wp")
+            service_info = SERVICES.get(service_key, SERVICES["tr_wp"])
 
-        processing_msg = await update.message.reply_text("🔄 Dekont onaylandı, numara alınıyor...")
+            processing_msg = await update.message.reply_text("🔄 Dekont onaylandı, numara alınıyor...")
 
-        number, info = await fetch_real_number_async(service_info["code"], service_info["country"])
+            number, info = await fetch_real_number_async(service_info["code"], service_info["country"])
 
-        if number:
-            text = (
-                f"✅ *Dekont Onaylandı & Numara Verildi!*\n\n"
-                f"📦 Servis: *{service_info['name']}*\n"
-                f"📱 *Numara:* `{number}`\n"
-                f"🆔 *İşlem ID:* `{info}`\n\n"
-                f"⚠️ Kod takibi için destek hattı: @{SUPPORT_USERNAME}"
-            )
-            keyboard = [[InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]]
-            await processing_msg.edit_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-        else:
-            text = (
-                f"✅ *Dekontunuz Onaylandı!*\n\n"
-                f"⚠️ API Yanıtı: `{info}`\n"
-                f"Lütfen dekontunuzla birlikte hemen canlı desteğe yazın, numaranız anında manuel verilsin:\n\n"
-                f"📞 Canlı Destek: @{SUPPORT_USERNAME}"
-            )
-            keyboard = [
-                [InlineKeyboardButton("📞 Canlı Destek", url=f"https://t.me/{SUPPORT_USERNAME}")],
-                [InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]
-            ]
-            await processing_msg.edit_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-        return
+            if number:
+                text = (
+                    f"✅ *Dekont Onaylandı & Numara Verildi!*\n\n"
+                    f"📦 Servis: *{service_info['name']}*\n"
+                    f"📱 *Numara:* `{number}`\n"
+                    f"🆔 *İşlem ID:* `{info}`\n\n"
+                    f"⚠️ Kod takibi için destek hattı: @{SUPPORT_USERNAME}"
+                )
+                keyboard = [[InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]]
+                await processing_msg.edit_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+            else:
+                text = (
+                    f"✅ *Dekontunuz Onaylandı!*\n\n"
+                    f"⚠️ API Yanıtı: `{info}`\n"
+                    f"Lütfen dekontunuzla birlikte hemen canlı desteğe yazın, numaranız anında manuel verilsin:\n\n"
+                    f"📞 Canlı Destek: @{SUPPORT_USERNAME}"
+                )
+                keyboard = [
+                    [InlineKeyboardButton("📞 Canlı Destek", url=f"https://t.me/{SUPPORT_USERNAME}")],
+                    [InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]
+                ]
+                await processing_msg.edit_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
 
-    await update.message.reply_text("📸 Lütfen geçerli bir banka dekontu gönderin.")
+        if update.message:
+            await update.message.reply_text("📸 Lütfen geçerli bir banka dekontu gönderin.")
+    except Exception as e:
+        logging.error(f"Dekont işleme hatası: {e}")
 
 def main():
     import requests
@@ -175,7 +184,7 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receipt_handler))
     
-    print("ANKA VIP SMS BOT Yeni API ile Başlatıldı!")
+    print("ANKA VIP SMS BOT Yeni Token ve Güvenlik Duvarı ile Başlatıldı!")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
