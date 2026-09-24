@@ -34,7 +34,7 @@ IBAN = "TR62 0006 2000 5000 0006 8107 73"
 RECIPIENT = "Resul Sakal"
 SUPPORT_USERNAME = "SMSPATRONUM"
 
-SMS_API_KEY = "osms_654ba30f923e5f40b693b3270c1817a31bd550f6ad04f8c9"
+SMS_API_KEY = "osms_4c3ea33d7aec68b1b618f7e0c58a85f39e5f205e99632fd4"
 SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
@@ -43,56 +43,56 @@ SERVICES = {
     "ph_wp": {
         "name": "🔥 Filipinler WhatsApp (En Çok Satan - %0 Risk)",
         "code": "whatsapp",
-        "countries": ["philippines", "indonesia", "vietnam", "malaysia", "russia", "kazakhstan", "ukraine"],
+        "countries": ["philippines", "indonesia", "vietnam", "malaysia", "russia", "kazakhstan", "ukraine", "0", "1", "2"],
         "price_tl": 200
     },
     "uk_wp": {
         "name": "🇬🇧 İngiltere WhatsApp",
         "code": "whatsapp",
-        "countries": ["uk", "england", "russia", "romania", "poland", "kazakhstan"],
+        "countries": ["uk", "england", "russia", "romania", "poland", "kazakhstan", "0", "1"],
         "price_tl": 150
     },
     "uk_tg": {
         "name": "🇬🇧 Yurt Dışı / İngiltere Telegram",
         "code": "telegram",
-        "countries": ["uk", "england", "russia", "kazakhstan", "ukraine", "indonesia", "philippines"],
+        "countries": ["uk", "england", "russia", "kazakhstan", "ukraine", "indonesia", "philippines", "0", "1"],
         "price_tl": 150
     },
     "tr_tg": {
         "name": "🇹🇷 TR Telegram",
         "code": "telegram",
-        "countries": ["turkey", "russia", "kazakhstan", "ukraine"],
+        "countries": ["turkey", "russia", "kazakhstan", "ukraine", "0"],
         "price_tl": 200
     },
     "tr_wp": {
         "name": "🇹🇷 TR WhatsApp",
         "code": "whatsapp",
-        "countries": ["turkey", "russia", "kazakhstan"],
+        "countries": ["turkey", "russia", "kazakhstan", "0"],
         "price_tl": 300
     },
     "tr_ig": {
         "name": "📸 TR Instagram",
         "code": "instagram",
-        "countries": ["turkey", "russia", "indonesia"],
+        "countries": ["turkey", "russia", "indonesia", "0"],
         "price_tl": 60
     },
     "tr_fb": {
         "name": "📘 TR Facebook",
         "code": "facebook",
-        "countries": ["turkey", "russia", "vietnam"],
+        "countries": ["turkey", "russia", "vietnam", "0"],
         "price_tl": 50
     },
     "tr_go": {
         "name": "🌐 TR Google / Gmail",
         "code": "google",
-        "countries": ["turkey", "russia", "kazakhstan", "indonesia"],
+        "countries": ["turkey", "russia", "kazakhstan", "indonesia", "0"],
         "price_tl": 30
     },
     "pay_turk_ifsa": {
         "name": "🔥 Türk İfşa (5 Adet Özel VIP Kanal)",
         "code": "vip_archive",
         "countries": [],
-        "price_tl": 300
+        "price_tl": 250
     }
 }
 
@@ -171,7 +171,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             service_key = data.replace("refresh_num_", "")
             service_info = SERVICES.get(service_key, SERVICES["ph_wp"])
             
-            await query.edit_message_text("🔄 Küresel havuzlar taranıyor, yeni numara aranıyor...")
+            await query.edit_message_text("🔄 Küresel havuzlar taranıyor, alternatif hatlar kontrol ediliyor...")
             
             number, activation_id, country_used = await fetch_number_with_fallback(service_info["code"], service_info["countries"])
             
@@ -180,7 +180,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 text = (
                     f"✅ *Yeni Numara Başarıyla Tanımlandı!*\n\n"
                     f"📦 Ürün: *{service_info['name']}*\n"
-                    f"🌍 Bölge/Ülke: `{country_used.upper()}`\n"
+                    f"🌍 Bölge/Ülke: `{str(country_used).upper()}`\n"
                     f"📱 *Yeni Numara:* `{number}`\n"
                     f"🆔 *İşlem ID:* `{activation_id}`\n\n"
                     f"⚠️ Kod gelmezse aşağıdaki butondan tekrar numara değiştirebilirsiniz."
@@ -192,8 +192,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
             else:
                 text = (
-                    f"⚠️ *Şu an API sitesine bağlanılamadı veya stok bulunamadı.*\n\n"
-                    f"Lütfen hemen canlı desteğe bildirin, anında manuel numara verilsin:\n\n"
+                    f"⚠️ *Anlık yoğunluk nedeniyle otomatik hat alınamadı.*\n\n"
+                    f"Lütfen dekontunuzla birlikte canlı desteğe bildirin, anında manuel numaranız tanımlansın:\n\n"
                     f"📞 Canlı Destek: @{SUPPORT_USERNAME}"
                 )
                 keyboard = [
@@ -216,6 +216,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def fetch_number_with_fallback(service_code, countries_list):
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     async with httpx.AsyncClient(timeout=20.0, headers=headers, follow_redirects=True) as client:
+        # Önce ülkelere göre sırayla deneriz
         for country in countries_list:
             params = {
                 "api_key": SMS_API_KEY,
@@ -226,7 +227,7 @@ async def fetch_number_with_fallback(service_code, countries_list):
             try:
                 response = await client.get(SMS_API_URL, params=params)
                 res_text = response.text.strip()
-                logging.info(f"API İstek [{service_code} - {country}] Yanıt: {res_text}")
+                logging.info(f"API İstek [{service_code} - Ülke/Param: {country}] Yanıt: {res_text}")
                 
                 if "ACCESS_NUMBER" in res_text:
                     parts = res_text.split(":")
@@ -235,6 +236,25 @@ async def fetch_number_with_fallback(service_code, countries_list):
                     return phone_number, activation_id, country
             except Exception as e:
                 logging.error(f"API Hatası [{country}]: {e}")
+                
+        # Eğer spesifik ülkelerden bulunamadıysa ülke parametresiz (genel havuz) son kez denenir
+        try:
+            params = {
+                "api_key": SMS_API_KEY,
+                "action": "getNumber",
+                "service": service_code
+            }
+            response = await client.get(SMS_API_URL, params=params)
+            res_text = response.text.strip()
+            logging.info(f"API Genel Havuz İstek [{service_code}] Yanıt: {res_text}")
+            if "ACCESS_NUMBER" in res_text:
+                parts = res_text.split(":")
+                activation_id = parts[1] if len(parts) > 1 else "Bilinmiyor"
+                phone_number = parts[2] if len(parts) > 2 else res_text
+                return phone_number, activation_id, "Genel Havuz"
+        except Exception as e:
+            logging.error(f"Genel Havuz API Hatası: {e}")
+
         return None, None, None
 
 async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -268,7 +288,7 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 text = (
                     f"✅ *Dekont Onaylandı & Numara Verildi!*\n\n"
                     f"📦 Ürün: *{service_info['name']}*\n"
-                    f"🌍 Bölge/Ülke: `{country_used.upper()}`\n"
+                    f"🌍 Bölge/Ülke: `{str(country_used).upper()}`\n"
                     f"📱 *Numara:* `{number}`\n"
                     f"🆔 *İşlem ID:* `{activation_id}`\n\n"
                     f"⚠️ Kod gelmezse aşağıdaki **'Numarayı Değiştir / Yenile'** butonunu kullanabilirsiniz."
@@ -281,8 +301,8 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 text = (
                     f"✅ *Dekontunuz Onaylandı!*\n\n"
-                    f"⚠️ SMS API havuzunda anlık yoğunluk var.\n"
-                    f"Lütfen dekontunuzla birlikte canlı desteğe yazın, hemen manuel verilsin:\n\n"
+                    f"⚠️ SMS API havuzunda şu an anlık yoğunluk yaşanıyor.\n"
+                    f"Lütfen dekontunuzla birlikte canlı desteğe yazın, hemen manuel numaranız verilsin:\n\n"
                     f"📞 Canlı Destek: @{SUPPORT_USERNAME}"
                 )
                 keyboard = [
