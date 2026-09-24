@@ -112,7 +112,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Start komutu hatası: {e}")
 
 async def text_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Dekont haricinde yazı yazıldığında kullanıcıya direkt ana menüyü gösterir"""
     try:
         if update.message and update.message.text:
             text = (
@@ -196,7 +195,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Buton işleme hatası: {e}")
 
 async def fetch_number_with_fallback(service_code, countries_list):
-    """Küresel ülke listesini sırayla dener, stok bulunan ilk ülkeden numarayı çeker"""
     async with httpx.AsyncClient(timeout=15.0) as client:
         for country in countries_list:
             params = {
@@ -263,10 +261,10 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     import requests
-    # Telegram tarafındaki eski webhook'ları ve bekleyen güncellemeleri tamamen temizler
+    # Telegram'daki eski webhook çakışmalarını ve dışarıdan kalan tüm askı süreçlerini sıfırlar
     try:
         requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook?drop_pending_updates=true", timeout=5)
-        logging.info("Telegram Webhook başarıyla sıfırlandı.")
+        logging.info("Webhook ve bekleyen güncellemeler başarıyla temizlendi.")
     except Exception as e:
         logging.error(f"Webhook sıfırlama hatası: {e}")
 
@@ -275,10 +273,9 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receipt_handler))
-    # Dekont harici herhangi bir yazı yazıldığında da menüyü açar
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message_handler))
+    app.add_handler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, text_message_handler)
     
-    print("ANKA VIP Ürün Menüsü ve Küresel Stok Botu Aktif!")
+    print("ANKA VIP Bot Kesintisiz Çalıştırılıyor!")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
