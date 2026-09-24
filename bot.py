@@ -20,7 +20,7 @@ class HealthCheckHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"ANKA VIP SMS Bot is secure and running!")
+        self.wfile.write(b"ANKA VIP Smart SMS Bot is live!")
 
 def run_web_server():
     with socketserver.TCPServer(("", PORT), HealthCheckHandler) as httpd:
@@ -28,27 +28,36 @@ def run_web_server():
 
 threading.Thread(target=run_web_server, daemon=True).start()
 
-# Yeni Güvenli Bot Tokeni
 BOT_TOKEN = "8874989367:AAE4ARinymcurNpCG9gF3hBrR0cKIoAP8aA"
 IBAN = "TR62 0006 2000 5000 0006 8107 73"
 RECIPIENT = "Resul Sakal"
 SUPPORT_USERNAME = "SMSPATRONUM"
 
-SMS_API_KEY = "osms_c9ddf6d893c3045941435ac1c6e01c6c70cb11d300116b6d"
+SMS_API_KEY = "osms_ff02e69d0bdd0ddf9106b60644059c77df21bb3b5a738a9e"
 SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
+# Servisler ve akıllı ülke havuzları (Stok yoksa sıradakini dener)
 SERVICES = {
-    "tr_wp": {"name": "🇹🇷 TR WhatsApp", "code": "whatsapp", "country": "turkey", "price_tl": 300},
-    "tr_tg": {"name": "🇹🇷 TR Telegram", "code": "telegram", "country": "turkey", "price_tl": 200},
-    "tr_ig": {"name": "📸 TR Instagram", "code": "instagram", "country": "turkey", "price_tl": 60},
-    "tr_fb": {"name": "📘 TR Facebook", "code": "facebook", "country": "turkey", "price_tl": 50},
-    "tr_go": {"name": "🌐 TR Google", "code": "google", "country": "turkey", "price_tl": 30},
-    "uk_wp": {"name": "🇬🇧 İngiltere WhatsApp", "code": "whatsapp", "country": "uk", "price_tl": 150},
-    "tr_dc": {"name": "🎮 TR Discord", "code": "discord", "country": "turkey", "price_tl": 75},
-    "tr_tw": {"name": "🐦 TR Twitter / X", "code": "twitter", "country": "turkey", "price_tl": 70},
-    "tr_sn": {"name": "👻 TR Snapchat", "code": "snapchat", "country": "turkey", "price_tl": 90}
+    "ph_wp": {
+        "name": "🔥 Filipinler WhatsApp (En Çok Satın Alınan - %0 Patlama Riskli)",
+        "code": "whatsapp",
+        "countries": ["philippines", "indonesia", "vietnam", "malaysia", "russia"], # Otomatik yedek ülke tarama havuzu
+        "price_tl": 200
+    },
+    "tr_tg": {
+        "name": "🇹🇷 TR Telegram",
+        "code": "telegram",
+        "countries": ["turkey", "russia", "kazakhstan"],
+        "price_tl": 200
+    },
+    "tr_wp": {
+        "name": "🇹🇷 TR WhatsApp",
+        "code": "whatsapp",
+        "countries": ["turkey"],
+        "price_tl": 300
+    }
 }
 
 def main_menu():
@@ -61,16 +70,16 @@ def main_menu():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         text = (
-            "💎 *ANKA VIP — SMS ONAY SERVİSİ*\n\n"
-            "⚡ Güvenli ve Hızlı Numara Tedariği\n"
-            "Aşağıdaki menüden almak istediğiniz servisi seçerek ödeme adımına geçebilirsiniz."
+            "💎 *ANKA VIP — PREMIUM SMS ONAY SERVİSİ*\n\n"
+            "⚡ Kesintisiz Otomatik Numara Tedariği\n"
+            "Aşağıdaki menüden almak istediğiniz güvenli servisi seçebilirsiniz."
         )
         if update.message:
             await update.message.reply_text(text, parse_mode="Markdown", reply_markup=main_menu())
         elif update.callback_query:
             await update.callback_query.message.edit_text(text, parse_mode="Markdown", reply_markup=main_menu())
     except Exception as e:
-        logging.error(f"Start komutu hatası: {e}")
+        logging.error(f"Start hatası: {e}")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -80,13 +89,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if data.startswith("iban_"):
             service_key = data.replace("iban_", "")
-            service_info = SERVICES.get(service_key, SERVICES["tr_wp"])
+            service_info = SERVICES.get(service_key, SERVICES["ph_wp"])
             
             context.user_data["selected_service"] = service_key
 
             text = (
                 f"💳 *IBAN İLE ÖDEME EKRANI*\n\n"
-                f"📦 Paket: *{service_info['name']}*\n"
+                f"📦 Ürün: *{service_info['name']}*\n"
                 f"💰 Tutar: *{service_info['price_tl']} TL*\n\n"
                 f"IBAN:\n`{IBAN}`\n\n"
                 f"Alıcı: *{RECIPIENT}*\n\n"
@@ -97,66 +106,108 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard = [[InlineKeyboardButton("⬅️ Geri", callback_data="home")]]
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
+        elif data.startswith("refresh_num_"):
+            # Müşteri "Numarayı Değiştir / Yenile" butonuna bastığında çalışır
+            service_key = data.replace("refresh_num_", "")
+            service_info = SERVICES.get(service_key, SERVICES["ph_wp"])
+            
+            await query.edit_message_text("🔄 Yeni numara aranıyor, lütfen bekleyin...")
+            
+            number, activation_id, country_used = await fetch_number_with_fallback(service_info["code"], service_info["countries"])
+            
+            if number:
+                context.user_data["active_activation_id"] = activation_id
+                text = (
+                    f"✅ *Yeni Numara Başarıyla Tanımlandı!*\n\n"
+                    f"📦 Ürün: *{service_info['name']}*\n"
+                    f"🌍 Bölge/Ülke: `{country_used.upper()}`\n"
+                    f"📱 *Yeni Numara:* `{number}`\n"
+                    f"🆔 *İşlem ID:* `{activation_id}`\n\n"
+                    f"⚠️ Kod gelmezse aşağıdaki butondan tekrar numara değiştirebilirsiniz."
+                )
+                keyboard = [
+                    [InlineKeyboardButton("🔄 Numarayı Değiştir / Yenile", callback_data=f"refresh_num_{service_key}")],
+                    [InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]
+                ]
+                await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+            else:
+                text = (
+                    f"⚠️ *Şu an tüm alternatif stoklarda yoğunluk var.*\n\n"
+                    f"Lütfen hemen canlı desteğe bildirin, anında manuel numara verilsin:\n\n"
+                    f"📞 Canlı Destek: @{SUPPORT_USERNAME}"
+                )
+                keyboard = [
+                    [InlineKeyboardButton("🔄 Tekrar Dene", callback_data=f"refresh_num_{service_key}")],
+                    [InlineKeyboardButton("📞 Canlı Destek", url=f"https://t.me/{SUPPORT_USERNAME}")],
+                    [InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]
+                ]
+                await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
         elif data == "home":
             text = (
-                "💎 *ANKA VIP — SMS ONAY SERVİSİ*\n\n"
-                "⚡ Güvenli ve Hızlı Numara Tedariği\n"
-                "Aşağıdaki menüden almak istediğiniz servisi seçebilirsiniz."
+                "💎 *ANKA VIP — PREMIUM SMS ONAY SERVİSİ*\n\n"
+                "⚡ Kesintisiz Otomatik Numara Tedariği\n"
+                "Aşağıdaki menüden almak istediğiniz güvenli servisi seçebilirsiniz."
             )
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=main_menu())
     except Exception as e:
         logging.error(f"Buton işleme hatası: {e}")
 
-async def fetch_real_number_async(service_code, country_code):
-    params = {
-        "api_key": SMS_API_KEY,
-        "action": "getNumber",
-        "service": service_code,
-        "country": country_code
-    }
-    
+async def fetch_number_with_fallback(service_code, countries_list):
+    """Ülke listesini sırayla dener, stok bulunan ilk ülkeden numarayı çeker"""
     async with httpx.AsyncClient(timeout=15.0) as client:
-        try:
-            response = await client.get(SMS_API_URL, params=params)
-            res_text = response.text.strip()
-            logging.info(f"API Yanıtı: {res_text} | Parametreler: {params}")
-            
-            if "ACCESS_NUMBER" in res_text:
-                parts = res_text.split(":")
-                activation_id = parts[1] if len(parts) > 1 else "Bilinmiyor"
-                phone_number = parts[2] if len(parts) > 2 else res_text
-                return phone_number, activation_id
-            else:
-                return None, res_text
-        except Exception as e:
-            logging.error(f"API Bağlantı Hatası: {e}")
-            return None, "CONNECTION_ERROR"
+        for country in countries_list:
+            params = {
+                "api_key": SMS_API_KEY,
+                "action": "getNumber",
+                "service": service_code,
+                "country": country
+            }
+            try:
+                response = await client.get(SMS_API_URL, params=params)
+                res_text = response.text.strip()
+                logging.info(f"Ülke denemesi [{country}]: {res_text}")
+                
+                if "ACCESS_NUMBER" in res_text:
+                    parts = res_text.split(":")
+                    activation_id = parts[1] if len(parts) > 1 else "Bilinmiyor"
+                    phone_number = parts[2] if len(parts) > 2 else res_text
+                    return phone_number, activation_id, country
+            except Exception as e:
+                logging.error(f"API Bağlantı Hatası ({country}): {e}")
+        
+        return None, None, None
 
 async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if update.message and (update.message.photo or update.message.document):
-            service_key = context.user_data.get("selected_service", "tr_wp")
-            service_info = SERVICES.get(service_key, SERVICES["tr_wp"])
+            service_key = context.user_data.get("selected_service", "ph_wp")
+            service_info = SERVICES.get(service_key, SERVICES["ph_wp"])
 
-            processing_msg = await update.message.reply_text("🔄 Dekont onaylandı, numara alınıyor...")
+            processing_msg = await update.message.reply_text("🔄 Dekont onaylandı, aktif stoklar taranıyor...")
 
-            number, info = await fetch_real_number_async(service_info["code"], service_info["country"])
+            number, activation_id, country_used = await fetch_number_with_fallback(service_info["code"], service_info["countries"])
 
             if number:
+                context.user_data["active_activation_id"] = activation_id
                 text = (
                     f"✅ *Dekont Onaylandı & Numara Verildi!*\n\n"
-                    f"📦 Servis: *{service_info['name']}*\n"
+                    f"📦 Ürün: *{service_info['name']}*\n"
+                    f"🌍 Bölge/Ülke: `{country_used.upper()}`\n"
                     f"📱 *Numara:* `{number}`\n"
-                    f"🆔 *İşlem ID:* `{info}`\n\n"
-                    f"⚠️ Kod takibi için destek hattı: @{SUPPORT_USERNAME}"
+                    f"🆔 *İşlem ID:* `{activation_id}`\n\n"
+                    f"⚠️ Kod gelmezse aşağıdaki **'Numarayı Değiştir'** butonunu kullanabilirsiniz."
                 )
-                keyboard = [[InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]]
+                keyboard = [
+                    [InlineKeyboardButton("🔄 Numarayı Değiştir / Yenile", callback_data=f"refresh_num_{service_key}")],
+                    [InlineKeyboardButton("🏠 Ana Menü", callback_data="home")]
+                ]
                 await processing_msg.edit_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
             else:
                 text = (
                     f"✅ *Dekontunuz Onaylandı!*\n\n"
-                    f"⚠️ API Yanıtı: `{info}`\n"
-                    f"Lütfen dekontunuzla birlikte hemen canlı desteğe yazın, numaranız anında manuel verilsin:\n\n"
+                    f"⚠️ Şuan otomatik havuzda geçici yoğunluk var.\n"
+                    f"Lütfen dekontunuzla birlikte canlı desteğe yazın, hemen manuel verilsin:\n\n"
                     f"📞 Canlı Destek: @{SUPPORT_USERNAME}"
                 )
                 keyboard = [
@@ -184,7 +235,7 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, receipt_handler))
     
-    print("ANKA VIP SMS BOT Yeni Token ve Güvenlik Duvarı ile Başlatıldı!")
+    print("ANKA VIP Akıllı Stok ve Numara Yenileme Botu Başlatıldı!")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
