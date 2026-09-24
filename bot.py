@@ -41,17 +41,17 @@ SMS_API_URL = "https://onaylasms.com.tr/stubs/handler_api.php"
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# İstediğin Servisler ve Karlı Fiyatlar (Yıldızlar tamamen kaldırıldı)
+# İstediğin Servisler ve Karşılıklı Fiyatlar (country: 0 veya Türkiye için uygun kodlar)
 SERVICES = {
-    "tr_wp": {"name": "🇹🇷 TR WhatsApp", "code": "wa", "country": "62", "price_tl": 300},
-    "tr_tg": {"name": "🇹🇷 TR Telegram", "code": "tg", "country": "62", "price_tl": 200},
-    "tr_ig": {"name": "📸 TR Instagram", "code": "ig", "country": "62", "price_tl": 60},
-    "tr_fb": {"name": "📘 TR Facebook", "code": "fb", "country": "62", "price_tl": 50},
-    "tr_go": {"name": "🌐 TR Google", "code": "go", "country": "62", "price_tl": 30},
+    "tr_wp": {"name": "🇹🇷 TR WhatsApp", "code": "wa", "country": "0", "price_tl": 300},
+    "tr_tg": {"name": "🇹🇷 TR Telegram", "code": "tg", "country": "0", "price_tl": 200},
+    "tr_ig": {"name": "📸 TR Instagram", "code": "ig", "country": "0", "price_tl": 60},
+    "tr_fb": {"name": "📘 TR Facebook", "code": "fb", "country": "0", "price_tl": 50},
+    "tr_go": {"name": "🌐 TR Google", "code": "go", "country": "0", "price_tl": 30},
     "uk_wp": {"name": "🇬🇧 İngiltere WhatsApp", "code": "wa", "country": "16", "price_tl": 150},
-    "tr_dc": {"name": "🎮 TR Discord", "code": "dc", "country": "62", "price_tl": 75},
-    "tr_tw": {"name": "🐦 TR Twitter / X", "code": "tw", "country": "62", "price_tl": 70},
-    "tr_sn": {"name": "👻 TR Snapchat", "code": "sn", "country": "62", "price_tl": 90}
+    "tr_dc": {"name": "🎮 TR Discord", "code": "dc", "country": "0", "price_tl": 75},
+    "tr_tw": {"name": "🐦 TR Twitter / X", "code": "tw", "country": "0", "price_tl": 70},
+    "tr_sn": {"name": "👻 TR Snapchat", "code": "sn", "country": "0", "price_tl": 90}
 }
 
 def main_menu():
@@ -104,7 +104,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=main_menu())
 
-# Numara Çekme ve Tekrar Deneme Döngüsü
+# Geliştirilmiş ve Hızlandırılmış Numara Çekme Fonksiyonu
 def fetch_real_number_with_retry(service_code, country_code):
     params = {
         "api_key": SMS_API_KEY,
@@ -114,11 +114,12 @@ def fetch_real_number_with_retry(service_code, country_code):
     }
     
     last_response = ""
-    for attempt in range(15):
+    # 20 kez ard arda hızlıca yoklar
+    for attempt in range(20):
         try:
             response = requests.get(SMS_API_URL, params=params, timeout=10)
             last_response = response.text.strip()
-            logging.info(f"Stok Sorgulama ({service_code} - Deneme {attempt+1}): {last_response}")
+            logging.info(f"API İstek Detayı -> Servis: {service_code}, Ülke: {country_code}, Deneme: {attempt+1}, Yanıt: {last_response}")
             
             if "ACCESS_NUMBER" in last_response:
                 parts = last_response.split(":")
@@ -126,11 +127,11 @@ def fetch_real_number_with_retry(service_code, country_code):
                 phone_number = parts[2] if len(parts) > 2 else last_response
                 return phone_number, f"Kod Bekleniyor (ID: {activation_id})"
             
-            time.sleep(1.5)
+            time.sleep(1)
         except Exception as e:
             last_response = str(e)
-            logging.error(f"API İstek Hatası: {last_response}")
-            time.sleep(1.5)
+            logging.error(f"API Bağlantı Hatası: {last_response}")
+            time.sleep(1)
             
     return None, last_response
 
@@ -139,13 +140,13 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         service_key = context.user_data.get("selected_service", "tr_wp")
         service_info = SERVICES.get(service_key, SERVICES["tr_wp"])
 
-        processing_msg = await update.message.reply_text("🔄 Dekont alındı, havuzdan anında numara çekiliyor, lütfen bekleyin...")
+        processing_msg = await update.message.reply_text("🔄 Dekont alındı, numara hazırlanıyor...")
 
         assigned_number, sms_status = fetch_real_number_with_retry(service_info["code"], service_info["country"])
 
         if assigned_number:
             text = (
-                f"✅ *Dekont Onaylandı & Numara Başarıyla Çekildi!*\n\n"
+                f"✅ *Dekontunuz onaylandı!*\n\n"
                 f"📦 Servis: *{service_info['name']}*\n"
                 f"📱 *Numara:* `{assigned_number}`\n"
                 f"💬 *Durum:* `{sms_status}`\n\n"
@@ -155,10 +156,9 @@ async def receipt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await processing_msg.edit_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
         else:
             text = (
-                "⚠️ *Şu an yoğunluktan dolayı havuzda anlık numara kalmadı!*\n\n"
-                f"API Yanıtı: `{sms_status}`\n"
-                f"Dekontunuz doğrulandı, lütfen hemen canlı desteğe yazarak numaranızı anında elden teslim alın:\n\n"
-                f"📞 Canlı Destek: @{SUPPORT_USERNAME}"
+                "⚠️ *Anlık yoğunluk nedeniyle alternatif havuzda da numara kalmadı.*\n"
+                f"Lütfen hemen canlı destekten numaranızı isteyin:\n\n"
+                f"📞 İletişim / Destek: @{SUPPORT_USERNAME}"
             )
             keyboard = [
                 [InlineKeyboardButton("📞 Canlı Destek ile Bağlan", url=f"https://t.me/{SUPPORT_USERNAME}")],
