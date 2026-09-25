@@ -29,7 +29,7 @@ def run_web_server():
 # Arka planda web sunucusunu başlatıyoruz (Render / Koyeb uyumlu)
 threading.Thread(target=run_web_server, daemon=True).start()
 
-BOT_TOKEN = "8874989367:AAFeyFjKEn4g5Rp45EC0nym-1yCFOCbEcbc"
+BOT_TOKEN =     "8874989367:AAGz6hpJGcRXCu51Za-i9UthZwiN8GDSh0M"
 IBAN = "TR62 0006 2000 5000 0006 8107 73"
 RECIPIENT = "Resul Sakal"
 SUPPORT_USERNAME = "SMSPATRONUM"
